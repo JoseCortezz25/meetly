@@ -7,8 +7,9 @@
 @theme inline {
   --color-background: var(--background);
   --color-foreground: var(--foreground);
-  --font-sans: var(--font-geist-sans);
-  --font-mono: var(--font-geist-mono);
+  --font-sans: var(--font-hanken), system-ui, sans-serif;
+  --font-display: var(--font-fraunces), Georgia, serif;
+  --font-mono: var(--font-jetbrains), ui-monospace, monospace;
   --color-sidebar-ring: var(--sidebar-ring);
   --color-sidebar-border: var(--sidebar-border);
   --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
@@ -58,6 +59,31 @@
   --color-white: #ffffff;
 
   --color-brand-red: #f00;
+}
+
+/* ============ Meetly design tokens (from UI prototype) ============ */
+@theme {
+  /* surfaces */
+  --color-ink: #16130f;
+  --color-ink-2: #1d1913;
+  --color-ink-3: #262019;
+  --color-ink-4: #322a20;
+  /* hairlines */
+  --color-line: rgba(244, 239, 233, 0.09);
+  --color-line-2: rgba(244, 239, 233, 0.16);
+  /* text */
+  --color-cream: #f4efe9;
+  --color-sand: #a89f92;
+  --color-sand-2: #756c60;
+  /* channel colors — meaningful, not decorative */
+  --color-mic: #ef7d4e;
+  --color-sys: #5cc7bf;
+  --color-gold: #e6b45c;
+  --color-ok: #7ec98f;
+  /* radii */
+  --radius-hero: 22px;
+  --radius-card: 14px;
+  --radius-chip: 10px;
 }
 
 :root {
@@ -134,6 +160,46 @@
     @apply border-border outline-ring/50;
   }
   body {
-    @apply bg-background text-foreground;
+    background: var(--color-ink);
+    color: var(--color-cream);
+    font-family: var(--font-hanken), system-ui, sans-serif;
+    min-height: 100vh;
+    /* clip (not hidden): prevents horizontal scroll without turning body into a
+       scroll container, which would break position: sticky on the top nav. */
+    overflow-x: clip;
+  }
+  /* atmospheric background */
+  body::before {
+    content: '';
+    position: fixed;
+    inset: 0;
+    background:
+      radial-gradient(
+        60% 55% at 82% 8%,
+        rgba(239, 125, 78, 0.1),
+        transparent 60%
+      ),
+      radial-gradient(
+        55% 50% at 6% 92%,
+        rgba(92, 199, 191, 0.08),
+        transparent 60%
+      ),
+      radial-gradient(
+        90% 60% at 50% 120%,
+        rgba(230, 180, 92, 0.05),
+        transparent 70%
+      );
+    pointer-events: none;
+    z-index: 0;
+  }
+  /* film grain */
+  body::after {
+    content: '';
+    position: fixed;
+    inset: 0;
+    pointer-events: none;
+    z-index: 1;
+    opacity: 0.035;
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='120' height='120'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='3'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
   }
 }
