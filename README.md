@@ -704,3 +704,29 @@ Contributions are welcome! Please follow these guidelines:
 [⬆ Back to Top](#nextjs-15-starter-template)
 
 </div>
+
+## Getting Started
+
+### Prerequisites
+- Node.js >= 20.11.0
+- pnpm >= 10.x
+
+### Installation
+
+```bash
+pnpm install
+```
+
+### Development Server
+
+```bash
+pnpm dev
+```
+
+Open [http://localhost:3000](http://localhost:3000) in your browser.
+
+### Build
+
+```bash
+pnpm build
+```
