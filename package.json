@@ -10,6 +10,7 @@
     "build": "next build",
     "start": "next start",
     "lint": "next lint",
+    "test": "jest",
     "preview": "next build && next start",
     "prepare": "husky",
     "prettier:format": "prettier --write .",

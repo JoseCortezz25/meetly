@@ -1,5 +1,12 @@
 import type { WebLLMLanguageModel, WebLLMProgress } from '@browser-ai/web-llm';
 import { getNotesModelId } from '@/lib/notes-settings';
+import {
+  chunkTranscriptTurns,
+  estimateTokens,
+  formatTranscriptTurn,
+  groupTextsByBudget,
+  NOTES_INPUT_BUDGET_TOKENS
+} from '../utils/notes-chunking.util';
 import type {
   ActionItem,
   MeetingNotes,
@@ -18,9 +25,7 @@ export class NotesError extends Error {
   }
 }
 
-const SYSTEM_PROMPT = [
-  'You are a meeting-notes assistant. Read the meeting transcript and produce concise, factual notes.',
-  'Write in the SAME LANGUAGE as the transcript.',
+const NOTES_FORMAT = [
   'Output ONLY the four sections below, with these exact headers and nothing else:',
   '',
   '## Summary',
@@ -38,6 +43,28 @@ const SYSTEM_PROMPT = [
   'Rules: do not invent details that are not in the transcript. If a section has no content, write "- none".'
 ].join('\n');
 
+const SYSTEM_PROMPT = [
+  'You are a meeting-notes assistant. Read the meeting transcript and produce concise, factual notes.',
+  'Write in the SAME LANGUAGE as the transcript.',
+  NOTES_FORMAT
+].join('\n');
+
+/** Map phase: notes for ONE portion of a longer transcript, same four sections. */
+const CHUNK_SYSTEM_PROMPT = [
+  'You are a meeting-notes assistant. You will receive ONE portion of a longer meeting transcript.',
+  'Produce concise, factual notes covering ONLY this portion. Be brief — these notes will be merged with notes from the other portions later.',
+  'Write in the SAME LANGUAGE as the transcript.',
+  NOTES_FORMAT
+].join('\n');
+
+/** Reduce phase: merge partial notes from consecutive portions into one set. */
+const MERGE_SYSTEM_PROMPT = [
+  'You are a meeting-notes assistant. You will receive partial meeting notes taken from consecutive portions of ONE meeting.',
+  'Combine them into a single set of notes: merge overlapping items, remove duplicates, and keep every distinct point.',
+  'Write in the SAME LANGUAGE as the partial notes.',
+  NOTES_FORMAT
+].join('\n');
+
 type GenerateNotesOptions = {
   onProgress?: (progress: NotesGenerationProgress) => void;
   onText?: (partial: string) => void;
@@ -46,8 +73,15 @@ type GenerateNotesOptions = {
 };
 
 const buildPrompt = (transcript: TranscriptTurn[]): string => {
-  const body = transcript.map(turn => `[${turn.time}] ${turn.text}`).join('\n');
+  const body = transcript.map(formatTranscriptTurn).join('\n');
   return `Meeting transcript:\n\n${body}`;
+};
+
+const buildMergePrompt = (partials: string[]): string => {
+  const body = partials
+    .map((partial, index) => `Part ${index + 1}:\n${partial}`)
+    .join('\n\n---\n\n');
+  return `Partial meeting notes:\n\n${body}`;
 };
 
 type Section = 'summary' | 'keyPoints' | 'actionItems' | 'decisions';
@@ -130,6 +164,33 @@ export const parseNotes = (raw: string): MeetingNotes => {
 };
 
 /**
+ * True when the error chain contains WebLLM's context-window overflow.
+ * `@mlc-ai/web-llm` throws `ContextWindowSizeExceededError` but does not
+ * export the class, so it is matched by name/message instead of `instanceof`.
+ */
+const isContextOverflowError = (error: unknown): boolean => {
+  if (!(error instanceof Error)) return false;
+  if (
+    error.name === 'ContextWindowSizeExceededError' ||
+    error.message.includes('context window size')
+  ) {
+    return true;
+  }
+  return isContextOverflowError(error.cause);
+};
+
+const toNotesError = (error: unknown): NotesError => {
+  if (error instanceof NotesError) return error;
+  if (isContextOverflowError(error)) {
+    return new NotesError(
+      'context-overflow',
+      'The prompt exceeded the model context window.'
+    );
+  }
+  return new NotesError('unknown', 'The model failed while generating notes.');
+};
+
+/**
  * Single WebLLM instance shared across every note. The model is downloaded and
  * initialized into GPU memory only once; each call to `webLLM(...)` would
  * otherwise build a fresh engine and reload the whole model. Keyed by model id
@@ -172,15 +233,131 @@ const getNotesEngine = async (): Promise<WebLLMLanguageModel> => {
   return notesEngine;
 };
 
+type GenerationPassOptions = {
+  system: string;
+  prompt: string;
+  signal?: AbortSignal;
+  /** Receives the accumulated text after each delta (final pass only). */
+  onDelta?: (accumulated: string) => void;
+};
+
+/**
+ * Runs one streamText pass and returns the full generated text. Each pass gets
+ * its own error capture: `streamText` reports failures through `onError`
+ * instead of throwing, so the error must be collected and re-thrown per call.
+ */
+const runGenerationPass = async (
+  model: WebLLMLanguageModel,
+  { system, prompt, signal, onDelta }: GenerationPassOptions
+): Promise<string> => {
+  const { streamText } = await import('ai');
+
+  let streamError: unknown = null;
+  const result = streamText({
+    model,
+    system,
+    prompt,
+    abortSignal: signal,
+    onError: ({ error }) => {
+      streamError = error;
+    }
+  });
+
+  let accumulated = '';
+  for await (const delta of result.textStream) {
+    accumulated += delta;
+    onDelta?.(accumulated);
+  }
+
+  if (streamError) throw toNotesError(streamError);
+  return accumulated;
+};
+
+/**
+ * Map-reduce fallback for transcripts that exceed the model context window:
+ * summarize each chunk into partial notes (map), then merge the partials —
+ * hierarchically if needed — until one final pass fits. Only the final merge
+ * streams to `onText`; intermediate passes surface through `onProgress` so the
+ * UI never renders partial-notes garbage.
+ */
+const generateNotesChunked = async (
+  model: WebLLMLanguageModel,
+  transcript: TranscriptTurn[],
+  { onProgress, onText, signal }: GenerateNotesOptions
+): Promise<string> => {
+  const chunks = chunkTranscriptTurns(transcript, NOTES_INPUT_BUDGET_TOKENS);
+
+  const partials: string[] = [];
+  for (const [index, chunk] of chunks.entries()) {
+    signal?.throwIfAborted();
+    onProgress?.({
+      stage: 'generating',
+      progress: index / chunks.length,
+      currentChunk: index + 1,
+      totalChunks: chunks.length
+    });
+    partials.push(
+      await runGenerationPass(model, {
+        system: CHUNK_SYSTEM_PROMPT,
+        prompt: buildPrompt(chunk),
+        signal
+      })
+    );
+  }
+
+  // Hierarchical reduce: while the combined partials do not fit, merge them in
+  // budget-sized groups. Each round with a group of 2+ shrinks the list, so a
+  // round that cannot shrink it means the content can never fit — bail out.
+  let merged = partials;
+  while (
+    merged.length > 1 &&
+    estimateTokens(buildMergePrompt(merged)) > NOTES_INPUT_BUDGET_TOKENS
+  ) {
+    const groups = groupTextsByBudget(merged, NOTES_INPUT_BUDGET_TOKENS);
+    if (groups.length >= merged.length) {
+      throw new NotesError(
+        'context-overflow',
+        'Partial notes still exceed the model context window.'
+      );
+    }
+    const next: string[] = [];
+    for (const group of groups) {
+      signal?.throwIfAborted();
+      onProgress?.({ stage: 'combining', progress: 1 });
+      next.push(
+        group.length === 1
+          ? group[0]
+          : await runGenerationPass(model, {
+              system: MERGE_SYSTEM_PROMPT,
+              prompt: buildMergePrompt(group),
+              signal
+            })
+      );
+    }
+    merged = next;
+  }
+
+  // Final pass — the only one that streams to the UI.
+  signal?.throwIfAborted();
+  onProgress?.({ stage: 'combining', progress: 1 });
+  return runGenerationPass(model, {
+    system: MERGE_SYSTEM_PROMPT,
+    prompt: buildMergePrompt(merged),
+    signal,
+    onDelta: onText
+  });
+};
+
 /**
  * Generates meeting notes from a transcript, fully on-device via WebLLM.
  * Reuses the shared model, so only the first note pays the load cost.
+ * Transcripts that fit the context window run in a single streamed pass;
+ * longer ones fall back to map-reduce summarization over transcript chunks.
  */
 export const generateNotes = async (
   transcript: TranscriptTurn[],
   { onProgress, onText, signal }: GenerateNotesOptions = {}
 ): Promise<MeetingNotes> => {
-  const { streamText } = await import('ai');
   const model = await getNotesEngine();
 
   const progressListener = (report: WebLLMProgress) =>
@@ -192,32 +369,27 @@ export const generateNotes = async (
   currentProgressListener = progressListener;
 
   try {
-    let streamError: unknown = null;
-    const result = streamText({
-      model,
-      system: SYSTEM_PROMPT,
-      prompt: buildPrompt(transcript),
-      abortSignal: signal,
-      onError: ({ error }) => {
-        streamError = error;
-      }
-    });
+    const fullPrompt = buildPrompt(transcript);
+    let raw: string;
 
-    let accumulated = '';
-    for await (const delta of result.textStream) {
-      accumulated += delta;
+    if (estimateTokens(fullPrompt) <= NOTES_INPUT_BUDGET_TOKENS) {
+      // Fast path: the whole transcript fits in one pass, streamed to the UI.
       onProgress?.({ stage: 'generating', progress: 1 });
-      onText?.(accumulated);
+      raw = await runGenerationPass(model, {
+        system: SYSTEM_PROMPT,
+        prompt: fullPrompt,
+        signal,
+        onDelta: onText
+      });
+    } else {
+      raw = await generateNotesChunked(model, transcript, {
+        onProgress,
+        onText,
+        signal
+      });
     }
 
-    if (streamError) {
-      throw new NotesError(
-        'unknown',
-        'The model failed while generating notes.'
-      );
-    }
-
-    return parseNotes(accumulated);
+    return parseNotes(raw);
   } finally {
     // Only detach if a newer generation hasn't already taken over the listener.
     if (currentProgressListener === progressListener) {
