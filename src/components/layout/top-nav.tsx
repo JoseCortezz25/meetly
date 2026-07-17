@@ -47,13 +47,14 @@ export const TopNav = () => {
             key={item.href}
             href={item.href}
             aria-current={active ? 'page' : undefined}
+            aria-label={item.label}
             className={cn(
-              'inline-flex items-center gap-2 rounded-full px-4 py-2 text-[14px] font-semibold transition-colors [&_svg]:size-[16px]',
+              'inline-flex items-center gap-2 rounded-full px-3.5 py-2 text-[14px] font-semibold transition-colors sm:px-4 [&_svg]:size-[16px]',
               active ? 'bg-cream text-ink' : 'text-sand hover:text-cream'
             )}
           >
             <Icon />
-            {item.label}
+            <span className="hidden sm:inline">{item.label}</span>
           </Link>
         );
       })}

@@ -7,27 +7,24 @@ import { listStoredMeetings } from '../../services/meetings-repository.service';
 import { dashboardMessages } from '../../messages';
 import type { Meeting } from '../../types/meeting.types';
 
-type RecentMeetingsProps = {
-  meetings: Meeting[];
-};
-
-export const RecentMeetings = ({ meetings }: RecentMeetingsProps) => {
-  const [stored, setStored] = useState<Meeting[]>([]);
+export const RecentMeetings = () => {
+  const [meetings, setMeetings] = useState<Meeting[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
     let active = true;
     listStoredMeetings()
       .then(rows => {
-        if (active) setStored(rows);
+        if (active) setMeetings(rows);
       })
-      .catch(() => {});
+      .catch(() => {})
+      .finally(() => {
+        if (active) setIsLoading(false);
+      });
     return () => {
       active = false;
     };
   }, []);
-
-  // Newest recordings first, then the seeded sample meetings.
-  const allMeetings = [...stored, ...meetings];
 
   return (
     <section>
@@ -42,11 +39,17 @@ export const RecentMeetings = ({ meetings }: RecentMeetingsProps) => {
           {dashboardMessages.recent.viewAll}
         </Link>
       </div>
-      <div className="grid grid-cols-[repeat(auto-fill,minmax(280px,1fr))] gap-4">
-        {allMeetings.map((meeting, index) => (
-          <MeetingCard key={meeting.id} meeting={meeting} seed={index + 1} />
-        ))}
-      </div>
+      {!isLoading && meetings.length === 0 ? (
+        <p className="text-sand-2 border-line rounded-card border border-dashed py-12 text-center text-[14px]">
+          {dashboardMessages.recent.empty}
+        </p>
+      ) : (
+        <div className="grid grid-cols-[repeat(auto-fill,minmax(280px,1fr))] gap-4">
+          {meetings.map((meeting, index) => (
+            <MeetingCard key={meeting.id} meeting={meeting} seed={index + 1} />
+          ))}
+        </div>
+      )}
     </section>
   );
 };

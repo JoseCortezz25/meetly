@@ -77,3 +77,13 @@ export const updateStoredMeetingNotes = async (
   if (!meeting) return;
   await saveMeeting({ ...meeting, notes });
 };
+
+/** Renames a persisted meeting. No-op if it is not stored. */
+export const updateStoredMeetingTitle = async (
+  id: string,
+  title: string
+): Promise<void> => {
+  const meeting = await getStoredMeeting(id);
+  if (!meeting) return;
+  await saveMeeting({ ...meeting, title });
+};

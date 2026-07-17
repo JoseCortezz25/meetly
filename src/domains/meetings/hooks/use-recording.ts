@@ -3,8 +3,10 @@
 import { useCallback, useEffect, useReducer, useRef, useState } from 'react';
 import {
   getTranscriptionLanguage,
+  getTranscriptionModel,
   languageLabel,
-  toWhisperLanguage
+  toWhisperLanguage,
+  transcriptionModelLabel
 } from '@/lib/transcription-settings';
 import {
   RecordingEngine,
@@ -12,7 +14,7 @@ import {
 } from '../services/recording-engine.service';
 import { transcribeRecording } from '../services/transcription.service';
 import { saveMeeting } from '../services/meetings-repository.service';
-import { recordedMeetingDefaults, transcriptionModelLabel } from '../messages';
+import { recordedMeetingDefaults } from '../messages';
 import type { AudioMode } from '../types/meeting.types';
 import type {
   StoredMeeting,
@@ -124,6 +126,7 @@ type BuildMeetingInput = {
   transcript: TranscriptTurn[];
   audioBlob: Blob;
   languageLabelValue: string;
+  modelLabel: string;
 };
 
 const buildStoredMeeting = ({
@@ -132,7 +135,8 @@ const buildStoredMeeting = ({
   durationLabel,
   transcript,
   audioBlob,
-  languageLabelValue
+  languageLabelValue,
+  modelLabel
 }: BuildMeetingInput): StoredMeeting => {
   const now = new Date();
   const { dateLabel, timeLabel } = formatDateParts(now);
@@ -150,7 +154,7 @@ const buildStoredMeeting = ({
     dateLabel,
     timeLabel,
     tag: recordedMeetingDefaults.tag,
-    model: transcriptionModelLabel,
+    model: modelLabel,
     language: languageLabelValue,
     participants: [],
     notes: { summary: '', keyPoints: [], actionItems: [], decisions: [] },
@@ -284,8 +288,10 @@ export const useRecording = () => {
       name: string
     ) => {
       const languageCode = getTranscriptionLanguage();
+      const model = getTranscriptionModel();
       try {
         const transcript = await transcribeRecording(recording.blob, {
+          model,
           language: toWhisperLanguage(languageCode),
           onProgress: progress =>
             dispatch({ type: 'transcriptionProgress', progress }),
@@ -297,7 +303,8 @@ export const useRecording = () => {
           durationLabel: recording.durationLabel,
           transcript,
           audioBlob: recording.blob,
-          languageLabelValue: languageLabel(languageCode)
+          languageLabelValue: languageLabel(languageCode),
+          modelLabel: transcriptionModelLabel(model)
         });
         await saveMeeting(meeting);
         URL.revokeObjectURL(recording.url);

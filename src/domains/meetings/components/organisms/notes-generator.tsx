@@ -2,6 +2,9 @@
 
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { Loader2, Sparkles, TriangleAlert } from 'lucide-react';
+import { NOTES_REQUIREMENTS } from '@/lib/system-capabilities';
+import { RequirementsModal } from '@/components/system/requirements-modal';
+import { useSystemCapabilities } from '@/components/system/use-system-capabilities';
 import {
   generateNotes,
   NotesError
@@ -33,6 +36,7 @@ export const NotesGenerator = ({
   const [errorCode, setErrorCode] = useState<NotesErrorCode>('unknown');
   const startedRef = useRef(false);
   const abortRef = useRef<AbortController | null>(null);
+  const caps = useSystemCapabilities(NOTES_REQUIREMENTS);
 
   const run = useCallback(async () => {
     abortRef.current?.abort();
@@ -56,12 +60,14 @@ export const NotesGenerator = ({
     }
   }, [transcript, onGenerated]);
 
-  // Auto-start once: notes are generated automatically when the detail opens.
+  // Auto-start once the browser check passes. If WebGPU is missing we hold and
+  // show the requirements modal; "Continue anyway" (dismiss) lets it try.
   useEffect(() => {
-    if (startedRef.current) return;
+    if (startedRef.current || caps.status !== 'ready') return;
+    if (!caps.isSupported && !caps.dismissed) return;
     startedRef.current = true;
     void run();
-  }, [run]);
+  }, [run, caps.status, caps.isSupported, caps.dismissed]);
 
   // Cancel any in-flight generation when navigating away.
   useEffect(() => () => abortRef.current?.abort(), []);
@@ -128,25 +134,38 @@ export const NotesGenerator = ({
     );
   }
 
+  const isBlocked =
+    caps.status === 'ready' && caps.missing.length > 0 && !caps.dismissed;
+
   return (
-    <div className="border-line rounded-card flex flex-col items-center border border-dashed px-6 py-12 text-center">
-      <span className="bg-gold/15 text-gold grid size-11 place-items-center rounded-full">
-        <Sparkles className="size-5" />
-      </span>
-      <h3 className="font-display text-cream mt-4 text-[20px] font-medium tracking-[-0.2px]">
-        {notesGeneratorMessages.title}
-      </h3>
-      <p className="text-sand mt-1.5 max-w-[440px] text-[14px] leading-[1.5]">
-        {notesGeneratorMessages.description}
-      </p>
-      <button
-        type="button"
-        onClick={run}
-        className="bg-cream text-ink mt-5 inline-flex items-center gap-2 rounded-full px-5 py-2.5 text-[14px] font-semibold transition-transform duration-100 hover:-translate-y-0.5 [&_svg]:size-[16px]"
-      >
-        <Sparkles />
-        {notesGeneratorMessages.cta}
-      </button>
-    </div>
+    <>
+      <div className="border-line rounded-card flex flex-col items-center border border-dashed px-6 py-12 text-center">
+        <span className="bg-gold/15 text-gold grid size-11 place-items-center rounded-full">
+          <Sparkles className="size-5" />
+        </span>
+        <h3 className="font-display text-cream mt-4 text-[20px] font-medium tracking-[-0.2px]">
+          {notesGeneratorMessages.title}
+        </h3>
+        <p className="text-sand mt-1.5 max-w-[440px] text-[14px] leading-[1.5]">
+          {notesGeneratorMessages.description}
+        </p>
+        <button
+          type="button"
+          onClick={run}
+          className="bg-cream text-ink mt-5 inline-flex items-center gap-2 rounded-full px-5 py-2.5 text-[14px] font-semibold transition-transform duration-100 hover:-translate-y-0.5 [&_svg]:size-[16px]"
+        >
+          <Sparkles />
+          {notesGeneratorMessages.cta}
+        </button>
+      </div>
+      {isBlocked && (
+        <RequirementsModal
+          missing={caps.missing}
+          report={caps.report}
+          onContinue={caps.dismiss}
+          onRecheck={caps.recheck}
+        />
+      )}
+    </>
   );
 };

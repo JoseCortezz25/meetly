@@ -39,7 +39,7 @@ export default function RootLayout({
         className={`${fraunces.variable} ${hankenGrotesk.variable} ${jetbrainsMono.variable} antialiased`}
       >
         <div className="sticky top-0 z-50">
-          <div className="mx-auto flex max-w-[1180px] justify-center px-[34px] py-4">
+          <div className="mx-auto flex max-w-[1180px] justify-center px-4 py-4 sm:px-[34px]">
             <TopNav />
           </div>
         </div>
