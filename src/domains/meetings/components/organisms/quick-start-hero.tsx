@@ -9,7 +9,7 @@ export const QuickStartHero = () => {
   const { hero } = dashboardMessages;
 
   return (
-    <section className="border-line rounded-hero mb-[34px] flex items-center justify-between gap-[30px] overflow-hidden border bg-[radial-gradient(120%_140%_at_90%_0%,_rgba(239,125,78,0.14),_transparent_55%),_var(--color-ink-2)] px-8 py-[30px]">
+    <section className="border-line rounded-hero mb-[34px] flex flex-col gap-6 overflow-hidden border bg-[radial-gradient(120%_140%_at_90%_0%,_rgba(239,125,78,0.14),_transparent_55%),_var(--color-ink-2)] px-5 py-6 sm:flex-row sm:items-center sm:justify-between sm:gap-[30px] sm:px-8 sm:py-[30px]">
       <div>
         <h2 className="font-display text-cream mb-2 text-[27px] font-medium tracking-[-0.5px]">
           {hero.title}

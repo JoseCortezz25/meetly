@@ -21,7 +21,7 @@ export const ModeSelector = ({
     <div className="flex justify-center">
       <div
         className={cn(
-          'border-line bg-ink inline-flex gap-[3px] rounded-full border p-1 transition-opacity',
+          'border-line bg-ink inline-flex max-w-full flex-wrap justify-center gap-[3px] rounded-[24px] border p-1 transition-opacity sm:flex-nowrap sm:rounded-full',
           isLocked && 'opacity-70'
         )}
         role="group"
@@ -36,7 +36,7 @@ export const ModeSelector = ({
               aria-pressed={isSelected}
               onClick={() => onSelect(mode)}
               className={cn(
-                'flex items-center gap-2 rounded-full px-5 py-[9px] text-[13.5px] font-semibold transition-colors',
+                'flex items-center gap-2 rounded-full px-4 py-[9px] text-[13px] font-semibold transition-colors sm:px-5 sm:text-[13.5px]',
                 isSelected ? 'bg-cream text-ink' : 'text-sand hover:text-cream',
                 isLocked && !isSelected && 'cursor-not-allowed',
                 !isLocked && 'cursor-pointer'

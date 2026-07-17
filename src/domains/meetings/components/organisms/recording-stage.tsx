@@ -50,7 +50,7 @@ export const RecordingStage = ({
   const hasSystemChannel = channels.includes('sys');
 
   return (
-    <section className="border-line rounded-lg border bg-[radial-gradient(120%_90%_at_50%_-10%,_rgba(239,125,78,0.08),_transparent_60%),_var(--color-ink-2)] p-[30px]">
+    <section className="border-line rounded-lg border bg-[radial-gradient(120%_90%_at_50%_-10%,_rgba(239,125,78,0.08),_transparent_60%),_var(--color-ink-2)] p-4 sm:p-[30px]">
       <ModeSelector
         modes={modes}
         activeMode={activeMode}

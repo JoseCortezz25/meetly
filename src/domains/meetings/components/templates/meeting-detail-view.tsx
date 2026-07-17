@@ -15,14 +15,14 @@ export const MeetingDetailView = ({
   isStored
 }: MeetingDetailViewProps) => {
   return (
-    <main className="relative z-[2] mx-auto max-w-[1180px] px-[34px] pt-[26px] pb-[80px]">
+    <main className="relative z-[2] mx-auto max-w-[1180px] px-4 pt-[26px] pb-[80px] sm:px-[34px]">
       <MeetingDetailHeader
         meeting={meeting}
         audioBlob={audioBlob}
         isStored={isStored}
       />
 
-      <div className="mt-10 grid gap-10 lg:grid-cols-[1fr_320px]">
+      <div className="mt-8 grid gap-8 sm:mt-10 lg:grid-cols-[1fr_320px] lg:gap-10">
         <MeetingNotesSection
           meetingId={meeting.id}
           notes={meeting.notes}

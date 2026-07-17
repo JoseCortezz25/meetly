@@ -19,7 +19,7 @@ export const RecordingControls = ({
   const { controls } = recordingMessages;
 
   return (
-    <div className="border-line bg-ink-2 inline-flex items-center gap-3 rounded-full border p-2 pl-5">
+    <div className="border-line bg-ink-2 flex max-w-full flex-wrap items-center justify-center gap-2 rounded-[26px] border p-2 px-3 sm:gap-3 sm:rounded-full sm:pr-2 sm:pl-5">
       <span className="text-sand font-mono text-[15px] font-medium tracking-[1px] tabular-nums">
         {timecode.minutes}:{timecode.seconds}
       </span>

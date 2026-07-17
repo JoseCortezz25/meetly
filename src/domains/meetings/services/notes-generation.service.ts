@@ -1,4 +1,5 @@
 import type { WebLLMLanguageModel, WebLLMProgress } from '@browser-ai/web-llm';
+import { getNotesModelId } from '@/lib/notes-settings';
 import type {
   ActionItem,
   MeetingNotes,
@@ -6,10 +7,6 @@ import type {
   NotesGenerationProgress,
   TranscriptTurn
 } from '../types/meeting-detail.types';
-
-/** WebGPU model used for note generation (matches the app's "Llama 3.2 3B" label). */
-export const NOTES_MODEL_ID = 'Llama-3.2-3B-Instruct-q4f16_1-MLC';
-export const NOTES_MODEL_LABEL = 'Llama 3.2 3B';
 
 export class NotesError extends Error {
   constructor(
@@ -135,9 +132,11 @@ export const parseNotes = (raw: string): MeetingNotes => {
 /**
  * Single WebLLM instance shared across every note. The model is downloaded and
  * initialized into GPU memory only once; each call to `webLLM(...)` would
- * otherwise build a fresh engine and reload the whole model.
+ * otherwise build a fresh engine and reload the whole model. Keyed by model id
+ * so switching the model in Settings rebuilds the engine, not every note.
  */
-let notesModel: WebLLMLanguageModel | null = null;
+let notesEngine: WebLLMLanguageModel | null = null;
+let notesEngineModelId: string | null = null;
 
 /**
  * Progress listener for the currently active generation. The engine's
@@ -147,12 +146,13 @@ let notesModel: WebLLMLanguageModel | null = null;
 let currentProgressListener: ((report: WebLLMProgress) => void) | null = null;
 
 /**
- * Returns the shared WebLLM model, creating it on first use. The instance
- * deduplicates its own initialization, so concurrent callers await the same
- * download instead of triggering competing loads.
+ * Returns the shared WebLLM engine for the model chosen in Settings, creating it
+ * on first use and rebuilding it only when the selected model changes. The
+ * instance deduplicates its own initialization, so concurrent callers await the
+ * same download instead of triggering competing loads.
  * Client-only: dynamically imported so the WebGPU engine never reaches SSR.
  */
-const getNotesModel = async (): Promise<WebLLMLanguageModel> => {
+const getNotesEngine = async (): Promise<WebLLMLanguageModel> => {
   const { webLLM, doesBrowserSupportWebLLM } = await import(
     '@browser-ai/web-llm'
   );
@@ -161,13 +161,15 @@ const getNotesModel = async (): Promise<WebLLMLanguageModel> => {
     throw new NotesError('no-webgpu', 'This browser does not support WebGPU.');
   }
 
-  if (!notesModel) {
-    notesModel = webLLM(NOTES_MODEL_ID, {
+  const modelId = getNotesModelId();
+  if (!notesEngine || notesEngineModelId !== modelId) {
+    notesEngine = webLLM(modelId, {
       initProgressCallback: report => currentProgressListener?.(report)
     });
+    notesEngineModelId = modelId;
   }
 
-  return notesModel;
+  return notesEngine;
 };
 
 /**
@@ -179,7 +181,7 @@ export const generateNotes = async (
   { onProgress, onText, signal }: GenerateNotesOptions = {}
 ): Promise<MeetingNotes> => {
   const { streamText } = await import('ai');
-  const model = await getNotesModel();
+  const model = await getNotesEngine();
 
   const progressListener = (report: WebLLMProgress) =>
     onProgress?.({

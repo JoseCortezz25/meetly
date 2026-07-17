@@ -2,7 +2,6 @@
 
 import { useEffect, useState } from 'react';
 import { MeetingDetailView } from '../templates/meeting-detail-view';
-import { getMeetingDetail } from '../../data/meeting-detail.mock';
 import { getStoredMeeting } from '../../services/meetings-repository.service';
 import { meetingDetailMessages } from '../../messages';
 import type { MeetingDetail } from '../../types/meeting-detail.types';
@@ -13,16 +12,11 @@ type MeetingDetailLoaderProps = {
 
 type LoaderState =
   | { status: 'loading' }
-  | {
-      status: 'found';
-      meeting: MeetingDetail;
-      audioBlob?: Blob;
-      isStored: boolean;
-    }
+  | { status: 'found'; meeting: MeetingDetail; audioBlob?: Blob }
   | { status: 'missing' };
 
 const StatusPanel = ({ text }: { text: string }) => (
-  <main className="relative z-[2] mx-auto max-w-[1180px] px-[34px] pt-[26px] pb-[80px]">
+  <main className="relative z-[2] mx-auto max-w-[1180px] px-4 pt-[26px] pb-[80px] sm:px-[34px]">
     <p className="text-sand-2 border-line rounded-card border border-dashed py-16 text-center text-[14px]">
       {text}
     </p>
@@ -30,28 +24,17 @@ const StatusPanel = ({ text }: { text: string }) => (
 );
 
 export const MeetingDetailLoader = ({ id }: MeetingDetailLoaderProps) => {
-  // Seeded mock meetings resolve synchronously; persisted ones load from IndexedDB.
-  const [state, setState] = useState<LoaderState>(() => {
-    const seeded = getMeetingDetail(id);
-    return seeded
-      ? { status: 'found', meeting: seeded, isStored: false }
-      : { status: 'loading' };
-  });
+  const [state, setState] = useState<LoaderState>({ status: 'loading' });
 
   useEffect(() => {
-    if (state.status !== 'loading') return;
     let active = true;
+    setState({ status: 'loading' });
     getStoredMeeting(id)
       .then(stored => {
         if (!active) return;
         setState(
           stored
-            ? {
-                status: 'found',
-                meeting: stored,
-                audioBlob: stored.audioBlob,
-                isStored: true
-              }
+            ? { status: 'found', meeting: stored, audioBlob: stored.audioBlob }
             : { status: 'missing' }
         );
       })
@@ -61,7 +44,7 @@ export const MeetingDetailLoader = ({ id }: MeetingDetailLoaderProps) => {
     return () => {
       active = false;
     };
-  }, [id, state.status]);
+  }, [id]);
 
   if (state.status === 'loading')
     return <StatusPanel text={meetingDetailMessages.loading} />;
@@ -71,7 +54,7 @@ export const MeetingDetailLoader = ({ id }: MeetingDetailLoaderProps) => {
     <MeetingDetailView
       meeting={state.meeting}
       audioBlob={state.audioBlob}
-      isStored={state.isStored}
+      isStored
     />
   );
 };

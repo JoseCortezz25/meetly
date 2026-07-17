@@ -17,7 +17,8 @@ export const dashboardMessages = {
   },
   recent: {
     title: 'Recent meetings',
-    viewAll: 'View all'
+    viewAll: 'View all',
+    empty: 'No recordings yet. Start one to see it here.'
   }
 } as const;
 
@@ -137,7 +138,10 @@ export const meetingDetailMessages = {
     deleteConfirm: 'Delete this meeting?',
     deleteConfirmYes: 'Delete',
     deleteCancel: 'Cancel',
-    editTitle: 'Rename meeting'
+    editTitle: 'Rename meeting',
+    renamePlaceholder: 'Meeting name',
+    renameSave: 'Save name',
+    renameCancel: 'Cancel rename'
   },
   sidebar: {
     details: 'Details',
@@ -173,9 +177,6 @@ export const processingMessages = {
     recordAgain: 'Record again'
   }
 } as const;
-
-/** Display label for the on-device model (the real id lives in the service). */
-export const transcriptionModelLabel = 'Whisper base';
 
 export const notesGeneratorMessages = {
   title: 'Generate AI notes',

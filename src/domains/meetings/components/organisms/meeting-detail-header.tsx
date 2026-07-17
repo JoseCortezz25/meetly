@@ -6,19 +6,24 @@ import { useRouter } from 'next/navigation';
 import {
   AlignLeft,
   AudioLines,
+  Check,
   ChevronDown,
   ChevronLeft,
   Download,
   FileText,
   Pencil,
-  Trash2
+  Trash2,
+  X
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { StatusBadge } from '../atoms/status-badge';
 import { ModeDot } from '../atoms/mode-dot';
 import { MeetingTag } from '../atoms/meeting-tag';
 import { IconButton } from '../atoms/icon-button';
-import { deleteStoredMeeting } from '../../services/meetings-repository.service';
+import {
+  deleteStoredMeeting,
+  updateStoredMeetingTitle
+} from '../../services/meetings-repository.service';
 import {
   downloadAudio,
   exportNotes,
@@ -49,7 +54,27 @@ export const MeetingDetailHeader = ({
   const router = useRouter();
   const [menuOpen, setMenuOpen] = useState(false);
   const [confirmingDelete, setConfirmingDelete] = useState(false);
+  const [title, setTitle] = useState(meeting.title);
+  const [isEditingTitle, setIsEditingTitle] = useState(false);
+  const [draftTitle, setDraftTitle] = useState(meeting.title);
   const { actions, backToDashboard } = meetingDetailMessages;
+
+  const startEditingTitle = () => {
+    setDraftTitle(title);
+    setIsEditingTitle(true);
+  };
+
+  const cancelEditingTitle = () => {
+    setIsEditingTitle(false);
+  };
+
+  const saveTitle = () => {
+    const trimmed = draftTitle.trim();
+    setIsEditingTitle(false);
+    if (trimmed.length === 0 || trimmed === title) return;
+    setTitle(trimmed);
+    void updateStoredMeetingTitle(meeting.id, trimmed);
+  };
 
   const hasNotes =
     meeting.notes.summary.trim().length > 0 ||
@@ -64,7 +89,7 @@ export const MeetingDetailHeader = ({
       key: 'notes',
       icon: <FileText />,
       label: actions.exportNotes,
-      onSelect: () => exportNotes(meeting)
+      onSelect: () => exportNotes({ ...meeting, title })
     });
   }
   if (hasTranscript) {
@@ -80,7 +105,7 @@ export const MeetingDetailHeader = ({
       key: 'audio',
       icon: <AudioLines />,
       label: actions.downloadAudio,
-      onSelect: () => downloadAudio(audioBlob, meeting.title)
+      onSelect: () => downloadAudio(audioBlob, title)
     });
   }
 
@@ -99,17 +124,50 @@ export const MeetingDetailHeader = ({
         {backToDashboard}
       </Link>
 
-      <div className="flex items-start justify-between gap-6">
-        <div>
+      <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between sm:gap-6">
+        <div className="min-w-0">
           <div className="flex items-center gap-3">
-            <h1 className="font-display text-cream text-[40px] leading-none font-medium tracking-[-0.5px]">
-              {meeting.title}
-            </h1>
-            <IconButton
-              label={actions.editTitle}
-              icon={<Pencil />}
-              className="size-8 rounded-[8px] border-transparent [&_svg]:size-[15px]"
-            />
+            {isEditingTitle ? (
+              <>
+                <input
+                  type="text"
+                  autoFocus
+                  value={draftTitle}
+                  onChange={event => setDraftTitle(event.target.value)}
+                  onKeyDown={event => {
+                    if (event.key === 'Enter') saveTitle();
+                    if (event.key === 'Escape') cancelEditingTitle();
+                  }}
+                  aria-label={actions.editTitle}
+                  placeholder={actions.renamePlaceholder}
+                  className="font-display text-cream border-line-2 focus:border-sys placeholder:text-sand-2 max-w-[560px] min-w-0 flex-1 border-b bg-transparent text-[28px] leading-none font-medium tracking-[-0.5px] focus:outline-none sm:text-[40px]"
+                />
+                <IconButton
+                  label={actions.renameSave}
+                  icon={<Check />}
+                  onClick={saveTitle}
+                  className="size-8 rounded-[8px] [&_svg]:size-[15px]"
+                />
+                <IconButton
+                  label={actions.renameCancel}
+                  icon={<X />}
+                  onClick={cancelEditingTitle}
+                  className="size-8 rounded-[8px] border-transparent [&_svg]:size-[15px]"
+                />
+              </>
+            ) : (
+              <>
+                <h1 className="font-display text-cream text-[28px] leading-none font-medium tracking-[-0.5px] sm:text-[40px]">
+                  {title}
+                </h1>
+                <IconButton
+                  label={actions.editTitle}
+                  icon={<Pencil />}
+                  onClick={startEditingTitle}
+                  className="size-8 rounded-[8px] border-transparent [&_svg]:size-[15px]"
+                />
+              </>
+            )}
           </div>
 
           <div className="mt-4 flex flex-wrap items-center gap-3">
@@ -129,7 +187,7 @@ export const MeetingDetailHeader = ({
           </div>
         </div>
 
-        <div className="flex shrink-0 items-center gap-2.5">
+        <div className="flex shrink-0 flex-wrap items-center gap-2.5">
           {exportItems.length > 0 && (
             <div className="relative">
               <button

@@ -6,26 +6,24 @@ import { listStoredMeetings } from '../../services/meetings-repository.service';
 import { notesListMessages } from '../../messages';
 import type { MeetingDetail } from '../../types/meeting-detail.types';
 
-type NotesListProps = {
-  meetings: MeetingDetail[];
-};
-
-export const NotesList = ({ meetings }: NotesListProps) => {
-  const [stored, setStored] = useState<MeetingDetail[]>([]);
+export const NotesList = () => {
+  const [meetings, setMeetings] = useState<MeetingDetail[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
     let active = true;
     listStoredMeetings()
       .then(rows => {
-        if (active) setStored(rows);
+        if (active) setMeetings(rows);
       })
-      .catch(() => {});
+      .catch(() => {})
+      .finally(() => {
+        if (active) setIsLoading(false);
+      });
     return () => {
       active = false;
     };
   }, []);
-
-  const allMeetings = [...stored, ...meetings];
 
   return (
     <section>
@@ -38,13 +36,13 @@ export const NotesList = ({ meetings }: NotesListProps) => {
         </p>
       </div>
 
-      {allMeetings.length === 0 ? (
+      {!isLoading && meetings.length === 0 ? (
         <p className="text-sand-2 border-line rounded-card border border-dashed py-12 text-center text-[14px]">
           {notesListMessages.empty}
         </p>
       ) : (
         <div className="grid gap-4 md:grid-cols-2">
-          {allMeetings.map(meeting => (
+          {meetings.map(meeting => (
             <NoteListCard key={meeting.id} meeting={meeting} />
           ))}
         </div>

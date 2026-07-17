@@ -57,11 +57,11 @@ export const CaptureChannel = ({
   return (
     <div
       className={cn(
-        'border-line rounded-card bg-ink flex items-stretch overflow-hidden border transition-[opacity,filter] duration-200',
+        'border-line rounded-card bg-ink flex flex-col items-stretch overflow-hidden border transition-[opacity,filter] duration-200 sm:flex-row',
         isMuted && 'opacity-50 grayscale-[0.6]'
       )}
     >
-      <div className="border-line flex w-[220px] shrink-0 flex-col justify-between gap-4 border-r p-[18px]">
+      <div className="border-line flex w-full shrink-0 flex-col justify-between gap-4 border-b p-[18px] sm:w-[220px] sm:border-r sm:border-b-0">
         <div className="flex items-start gap-2.5">
           <span
             className={cn(

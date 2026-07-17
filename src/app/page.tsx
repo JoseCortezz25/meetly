@@ -1,7 +1,6 @@
 import { DashboardHeader } from '@/domains/meetings/components/organisms/dashboard-header';
 import { QuickStartHero } from '@/domains/meetings/components/organisms/quick-start-hero';
 import { RecentMeetings } from '@/domains/meetings/components/organisms/recent-meetings';
-import { recentMeetingsMock } from '@/domains/meetings/data/recent-meetings.mock';
 import { dashboardMessages } from '@/domains/meetings/messages';
 
 const resolveGreeting = (hour: number): string => {
@@ -25,13 +24,13 @@ export default function Home() {
   const now = new Date();
 
   return (
-    <main className="relative z-[2] mx-auto max-w-[1180px] px-[34px] pt-[26px] pb-[60px]">
+    <main className="relative z-[2] mx-auto max-w-[1180px] px-4 pt-[26px] pb-[60px] sm:px-[34px]">
       <DashboardHeader
         dateLabel={formatDateLabel(now)}
         greeting={resolveGreeting(now.getHours())}
       />
       <QuickStartHero />
-      <RecentMeetings meetings={recentMeetingsMock} />
+      <RecentMeetings />
     </main>
   );
 }
