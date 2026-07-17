@@ -1,0 +1,35 @@
+.onboarding-modal__button {
+  @apply inline-flex items-center justify-center rounded-full px-5 py-2.5 text-[13.5px] font-semibold;
+}
+
+.onboarding-modal__button--primary {
+  @apply bg-cream text-ink transition-transform duration-100 hover:-translate-y-0.5;
+}
+
+.onboarding-modal__button--ghost {
+  @apply border-line-2 text-cream hover:bg-ink-3 border transition-colors;
+}
+
+.onboarding-modal__skip {
+  @apply text-sand hover:text-cream text-[12.5px] font-semibold transition-colors;
+}
+
+.onboarding-step-indicator {
+  @apply flex items-center gap-2;
+}
+
+.onboarding-step-indicator__dot {
+  @apply bg-line-2 size-2 rounded-full transition-all duration-200;
+}
+
+.onboarding-step-indicator__dot--active {
+  @apply bg-cream w-5;
+}
+
+.onboarding-step-image {
+  @apply h-full w-full object-cover;
+}
+
+.onboarding-step-image--placeholder {
+  @apply text-sand-2 flex flex-col items-center justify-center gap-2 text-[12px] font-medium;
+}

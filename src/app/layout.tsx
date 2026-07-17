@@ -2,6 +2,7 @@ import type { Metadata } from 'next';
 // eslint-disable-next-line camelcase
 import { Fraunces, Hanken_Grotesk, JetBrains_Mono } from 'next/font/google';
 import { TopNav } from '@/components/layout/top-nav';
+import { OnboardingModal } from '@/domains/onboarding/components/organisms/onboarding-modal';
 import './globals.css';
 
 const fraunces = Fraunces({
@@ -44,6 +45,7 @@ export default function RootLayout({
           </div>
         </div>
         {children}
+        <OnboardingModal />
       </body>
     </html>
   );

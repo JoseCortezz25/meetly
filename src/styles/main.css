@@ -1,2 +1,3 @@
 @import './components/atoms/input.css';
 @import './components/atoms/button.css';
+@import './domains/onboarding/onboarding-modal.css';
