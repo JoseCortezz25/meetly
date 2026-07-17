@@ -24,6 +24,21 @@ type NotesGeneratorProps = {
 
 type GeneratorState = 'idle' | 'running' | 'error';
 
+/** Status line for the running card, including chunked-generation progress. */
+const resolveRunningLabel = (
+  progress: NotesGenerationProgress | null
+): string => {
+  if (progress?.stage === 'loading') return notesGeneratorMessages.loadingModel;
+  if (progress?.stage === 'combining') return notesGeneratorMessages.combining;
+  if (progress?.currentChunk && progress?.totalChunks) {
+    return notesGeneratorMessages.generatingChunk(
+      progress.currentChunk,
+      progress.totalChunks
+    );
+  }
+  return notesGeneratorMessages.generating;
+};
+
 export const NotesGenerator = ({
   transcript,
   onGenerated
@@ -94,19 +109,19 @@ export const NotesGenerator = ({
 
   if (state === 'running') {
     const isLoadingModel = progress?.stage === 'loading';
+    const isChunkedGenerating =
+      progress?.stage === 'generating' && progress.totalChunks != null;
     const pct = Math.round((progress?.progress ?? 0) * 100);
     return (
       <div className="border-line rounded-card border p-6">
         <div className="flex items-center gap-2.5">
           <Loader2 className="text-sys size-[18px] animate-spin" />
           <span className="text-cream text-[14px] font-semibold">
-            {isLoadingModel
-              ? notesGeneratorMessages.loadingModel
-              : notesGeneratorMessages.generating}
+            {resolveRunningLabel(progress)}
           </span>
         </div>
 
-        {isLoadingModel && (
+        {(isLoadingModel || isChunkedGenerating) && (
           <>
             <div className="bg-ink-4 mt-4 h-1.5 w-full overflow-hidden rounded-full">
               <div

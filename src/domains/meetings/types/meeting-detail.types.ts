@@ -39,16 +39,20 @@ export type MeetingNotes = {
 };
 
 /** Phase of on-device note generation (WebLLM). */
-export type NotesGenerationStage = 'loading' | 'generating';
+export type NotesGenerationStage = 'loading' | 'generating' | 'combining';
 
 export type NotesGenerationProgress = {
   stage: NotesGenerationStage;
-  /** 0–1 during model download; indeterminate while generating. */
+  /** 0–1 during model download and chunked generation; 1 when indeterminate. */
   progress: number;
   text?: string;
+  /** 1-based index of the transcript chunk being summarized (long transcripts only). */
+  currentChunk?: number;
+  /** Total transcript chunks in the current run (long transcripts only). */
+  totalChunks?: number;
 };
 
-export type NotesErrorCode = 'no-webgpu' | 'unknown';
+export type NotesErrorCode = 'no-webgpu' | 'context-overflow' | 'unknown';
 
 /** A meeting persisted locally (IndexedDB): full detail + audio + sort key. */
 export type StoredMeeting = MeetingDetail & {

@@ -1,4 +1,5 @@
 import type { AudioMode, MeetingStatus } from './types/meeting.types';
+import type { NotesErrorCode } from './types/meeting-detail.types';
 import type { ChannelKind, RecordingErrorCode } from './types/recording.types';
 
 export const dashboardMessages = {
@@ -185,17 +186,23 @@ export const notesGeneratorMessages = {
   cta: 'Generate notes',
   loadingModel: 'Downloading model…',
   generating: 'Reading the transcript…',
+  generatingChunk: (current: number, total: number) =>
+    `Summarizing part ${current} of ${total}…`,
+  combining: 'Combining notes…',
   previewHeading: 'Draft',
   errors: {
     noWebgpu:
       'AI notes need a WebGPU browser (Chrome 113+ or Edge). This browser is not supported.',
+    contextOverflow:
+      'This transcript is too long for the on-device model, even after splitting it into sections. Try a different model in Settings.',
     unknown: 'Could not generate notes. Please try again.'
   },
   retry: 'Try again'
 } as const;
 
-export const notesErrorLabels: Record<'no-webgpu' | 'unknown', string> = {
+export const notesErrorLabels: Record<NotesErrorCode, string> = {
   'no-webgpu': notesGeneratorMessages.errors.noWebgpu,
+  'context-overflow': notesGeneratorMessages.errors.contextOverflow,
   unknown: notesGeneratorMessages.errors.unknown
 };
 
