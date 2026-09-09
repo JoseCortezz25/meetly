@@ -1,18 +1,13 @@
 'use client';
 
-import { useCallback, useEffect, useRef, useState } from 'react';
 import { Loader2, Sparkles, TriangleAlert } from 'lucide-react';
 import { NOTES_REQUIREMENTS } from '@/lib/system-capabilities';
 import { RequirementsModal } from '@/components/system/requirements-modal';
 import { useSystemCapabilities } from '@/components/system/use-system-capabilities';
-import {
-  generateNotes,
-  NotesError
-} from '../../services/notes-generation.service';
+import { useNotesGeneration } from '../../hooks/use-notes-generation';
 import { notesErrorLabels, notesGeneratorMessages } from '../../messages';
 import type {
   MeetingNotes,
-  NotesErrorCode,
   NotesGenerationProgress,
   TranscriptTurn
 } from '../../types/meeting-detail.types';
@@ -20,9 +15,9 @@ import type {
 type NotesGeneratorProps = {
   transcript: TranscriptTurn[];
   onGenerated: (notes: MeetingNotes) => void;
+  /** When set, shows a cancel action that returns to the existing notes. */
+  onCancel?: () => void;
 };
-
-type GeneratorState = 'idle' | 'running' | 'error';
 
 /** Status line for the running card, including chunked-generation progress. */
 const resolveRunningLabel = (
@@ -41,51 +36,21 @@ const resolveRunningLabel = (
 
 export const NotesGenerator = ({
   transcript,
-  onGenerated
+  onGenerated,
+  onCancel
 }: NotesGeneratorProps) => {
-  const [state, setState] = useState<GeneratorState>('idle');
-  const [progress, setProgress] = useState<NotesGenerationProgress | null>(
-    null
-  );
-  const [draft, setDraft] = useState('');
-  const [errorCode, setErrorCode] = useState<NotesErrorCode>('unknown');
-  const startedRef = useRef(false);
-  const abortRef = useRef<AbortController | null>(null);
   const caps = useSystemCapabilities(NOTES_REQUIREMENTS);
-
-  const run = useCallback(async () => {
-    abortRef.current?.abort();
-    const controller = new AbortController();
-    abortRef.current = controller;
-
-    setState('running');
-    setDraft('');
-    setProgress({ stage: 'loading', progress: 0 });
-    try {
-      const notes = await generateNotes(transcript, {
-        onProgress: setProgress,
-        onText: setDraft,
-        signal: controller.signal
-      });
-      onGenerated(notes);
-    } catch (error) {
-      if (controller.signal.aborted) return;
-      setErrorCode(error instanceof NotesError ? error.code : 'unknown');
-      setState('error');
-    }
-  }, [transcript, onGenerated]);
 
   // Auto-start once the browser check passes. If WebGPU is missing we hold and
   // show the requirements modal; "Continue anyway" (dismiss) lets it try.
-  useEffect(() => {
-    if (startedRef.current || caps.status !== 'ready') return;
-    if (!caps.isSupported && !caps.dismissed) return;
-    startedRef.current = true;
-    void run();
-  }, [run, caps.status, caps.isSupported, caps.dismissed]);
-
-  // Cancel any in-flight generation when navigating away.
-  useEffect(() => () => abortRef.current?.abort(), []);
+  const shouldAutoStart =
+    caps.status === 'ready' && (caps.isSupported || caps.dismissed);
+  const { state, progress, draft, errorCode, handleGenerate } =
+    useNotesGeneration({
+      transcript,
+      onGenerated,
+      autoStart: shouldAutoStart
+    });
 
   if (state === 'error') {
     return (
@@ -96,13 +61,24 @@ export const NotesGenerator = ({
         <p className="text-sand mt-4 max-w-[420px] text-[14px] leading-[1.5]">
           {notesErrorLabels[errorCode]}
         </p>
-        <button
-          type="button"
-          onClick={run}
-          className="border-line-2 hover:bg-ink-3 text-cream mt-5 rounded-full border px-5 py-2.5 text-[13.5px] font-semibold transition-colors"
-        >
-          {notesGeneratorMessages.retry}
-        </button>
+        <div className="mt-5 flex items-center gap-3">
+          <button
+            type="button"
+            onClick={handleGenerate}
+            className="border-line-2 hover:bg-ink-3 text-cream rounded-full border px-5 py-2.5 text-[13.5px] font-semibold transition-colors"
+          >
+            {notesGeneratorMessages.retry}
+          </button>
+          {onCancel && (
+            <button
+              type="button"
+              onClick={onCancel}
+              className="text-sand hover:text-cream rounded-full px-5 py-2.5 text-[13.5px] font-semibold transition-colors"
+            >
+              {notesGeneratorMessages.cancel}
+            </button>
+          )}
+        </div>
       </div>
     );
   }
@@ -114,11 +90,22 @@ export const NotesGenerator = ({
     const pct = Math.round((progress?.progress ?? 0) * 100);
     return (
       <div className="border-line rounded-card border p-6">
-        <div className="flex items-center gap-2.5">
-          <Loader2 className="text-sys size-[18px] animate-spin" />
-          <span className="text-cream text-[14px] font-semibold">
-            {resolveRunningLabel(progress)}
-          </span>
+        <div className="flex items-center justify-between gap-3">
+          <div className="flex items-center gap-2.5">
+            <Loader2 className="text-sys size-[18px] animate-spin" />
+            <span className="text-cream text-[14px] font-semibold">
+              {resolveRunningLabel(progress)}
+            </span>
+          </div>
+          {onCancel && (
+            <button
+              type="button"
+              onClick={onCancel}
+              className="text-sand hover:text-cream text-[13px] font-semibold transition-colors"
+            >
+              {notesGeneratorMessages.cancel}
+            </button>
+          )}
         </div>
 
         {(isLoadingModel || isChunkedGenerating) && (
@@ -164,14 +151,25 @@ export const NotesGenerator = ({
         <p className="text-sand mt-1.5 max-w-[440px] text-[14px] leading-[1.5]">
           {notesGeneratorMessages.description}
         </p>
-        <button
-          type="button"
-          onClick={run}
-          className="bg-cream text-ink mt-5 inline-flex items-center gap-2 rounded-full px-5 py-2.5 text-[14px] font-semibold transition-transform duration-100 hover:-translate-y-0.5 [&_svg]:size-[16px]"
-        >
-          <Sparkles />
-          {notesGeneratorMessages.cta}
-        </button>
+        <div className="mt-5 flex items-center gap-3">
+          <button
+            type="button"
+            onClick={handleGenerate}
+            className="bg-cream text-ink inline-flex items-center gap-2 rounded-full px-5 py-2.5 text-[14px] font-semibold transition-transform duration-100 hover:-translate-y-0.5 [&_svg]:size-[16px]"
+          >
+            <Sparkles />
+            {notesGeneratorMessages.cta}
+          </button>
+          {onCancel && (
+            <button
+              type="button"
+              onClick={onCancel}
+              className="text-sand hover:text-cream rounded-full px-5 py-2.5 text-[13.5px] font-semibold transition-colors"
+            >
+              {notesGeneratorMessages.cancel}
+            </button>
+          )}
+        </div>
       </div>
       {isBlocked && (
         <RequirementsModal

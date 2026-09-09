@@ -8,6 +8,7 @@ import type { AudioMode } from '../../types/meeting.types';
 import type {
   ChannelAnalysers,
   ChannelKind,
+  ChannelLabels,
   ChannelMuteState,
   Timecode as TimecodeValue
 } from '../../types/recording.types';
@@ -22,6 +23,7 @@ type RecordingStageProps = {
   channels: ChannelKind[];
   muted: ChannelMuteState;
   analysers: ChannelAnalysers;
+  labels: ChannelLabels;
   onSelectMode: (mode: AudioMode) => void;
   onToggleMute: (channel: ChannelKind) => void;
 };
@@ -43,6 +45,7 @@ export const RecordingStage = ({
   channels,
   muted,
   analysers,
+  labels,
   onSelectMode,
   onToggleMute
 }: RecordingStageProps) => {
@@ -98,6 +101,7 @@ export const RecordingStage = ({
               isActive={isRecording && !muted[channel]}
               muteLabel={muteAriaLabel(channel, muted[channel])}
               analyser={analysers[channel]}
+              deviceLabel={labels[channel]}
               onToggleMute={() => onToggleMute(channel)}
             />
           ))}

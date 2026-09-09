@@ -52,7 +52,12 @@ export type NotesGenerationProgress = {
   totalChunks?: number;
 };
 
-export type NotesErrorCode = 'no-webgpu' | 'context-overflow' | 'unknown';
+export type NotesErrorCode =
+  | 'no-webgpu'
+  | 'context-overflow'
+  | 'api-key-missing'
+  | 'provider-error'
+  | 'unknown';
 
 /** A meeting persisted locally (IndexedDB): full detail + audio + sort key. */
 export type StoredMeeting = MeetingDetail & {

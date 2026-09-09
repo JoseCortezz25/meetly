@@ -1,3 +1,4 @@
+import { RefreshCw } from 'lucide-react';
 import { NoteHeading } from '../atoms/note-heading';
 import { ActionItemCard } from '../molecules/action-item-card';
 import { meetingDetailMessages } from '../../messages';
@@ -5,9 +6,11 @@ import type { MeetingNotes } from '../../types/meeting-detail.types';
 
 type AiNotesPanelProps = {
   notes: MeetingNotes;
+  /** Shown when the meeting can regenerate its notes. */
+  onRegenerate?: () => void;
 };
 
-export const AiNotesPanel = ({ notes }: AiNotesPanelProps) => {
+export const AiNotesPanel = ({ notes, onRegenerate }: AiNotesPanelProps) => {
   const { sections, actionItemMeta } = meetingDetailMessages;
 
   const isEmpty =
@@ -26,6 +29,18 @@ export const AiNotesPanel = ({ notes }: AiNotesPanelProps) => {
 
   return (
     <div className="flex flex-col gap-10">
+      {onRegenerate && (
+        <div className="flex justify-end">
+          <button
+            type="button"
+            onClick={onRegenerate}
+            className="border-line-2 hover:bg-ink-3 text-cream inline-flex items-center gap-2 rounded-full border px-4 py-2 text-[13px] font-semibold transition-colors [&_svg]:size-[14px]"
+          >
+            <RefreshCw />
+            {meetingDetailMessages.actions.regenerate}
+          </button>
+        </div>
+      )}
       <section className="flex flex-col gap-3.5">
         <NoteHeading title={sections.summary} accent="gold" />
         <p className="text-sand max-w-[680px] text-[15.5px] leading-[1.65]">

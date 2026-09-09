@@ -23,6 +23,7 @@ import type {
 import type {
   ChannelAnalysers,
   ChannelKind,
+  ChannelLabels,
   ChannelMuteState,
   RecordingErrorCode,
   RecordingResult,
@@ -33,6 +34,7 @@ import type {
 
 const TICK_INTERVAL_MS = 60;
 const NO_ANALYSERS: ChannelAnalysers = { mic: null, sys: null };
+const NO_LABELS: ChannelLabels = { mic: null, sys: null };
 
 type RecordingState = {
   mode: AudioMode | null;
@@ -67,7 +69,7 @@ type RecordingAction =
   | { type: 'tick'; deltaMs: number };
 
 const initialState: RecordingState = {
-  mode: null,
+  mode: 'mix',
   status: 'idle',
   meetingName: '',
   muted: { mic: false, sys: false },
@@ -245,6 +247,7 @@ const toErrorCode = (error: unknown): RecordingErrorCode =>
 export const useRecording = () => {
   const [state, dispatch] = useReducer(recordingReducer, initialState);
   const [analysers, setAnalysers] = useState<ChannelAnalysers>(NO_ANALYSERS);
+  const [channelLabels, setChannelLabels] = useState<ChannelLabels>(NO_LABELS);
   const engineRef = useRef<RecordingEngine | null>(null);
   const {
     mode,
@@ -327,6 +330,10 @@ export const useRecording = () => {
         mic: engine.getAnalyser('mic'),
         sys: engine.getAnalyser('sys')
       });
+      setChannelLabels({
+        mic: engine.getTrackLabel('mic'),
+        sys: engine.getTrackLabel('sys')
+      });
       dispatch({ type: 'started' });
     } catch (error) {
       engine.dispose();
@@ -350,6 +357,7 @@ export const useRecording = () => {
     const blob = await engine.stop();
     engineRef.current = null;
     setAnalysers(NO_ANALYSERS);
+    setChannelLabels(NO_LABELS);
     const recording: RecordingResult = {
       blob,
       url: URL.createObjectURL(blob),
@@ -393,6 +401,7 @@ export const useRecording = () => {
     meetingName,
     muted,
     analysers,
+    channelLabels,
     channels: channelsForMode(mode),
     timecode: formatTimecode(elapsedMs),
     errorCode,

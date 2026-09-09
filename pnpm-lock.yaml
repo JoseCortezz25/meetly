@@ -4,10 +4,22 @@ settings:
   autoInstallPeers: true
   excludeLinksFromLockfile: false
 
+overrides:
+  '@ai-sdk/provider-utils@4.0.41': 4.0.39
+
 importers:
 
   .:
     dependencies:
+      '@ai-sdk/google':
+        specifier: ^3.0.103
+        version: 3.0.103(zod@3.25.76)
+      '@ai-sdk/openai':
+        specifier: ^3.0.90
+        version: 3.0.90(zod@3.25.76)
+      '@ai-sdk/openai-compatible':
+        specifier: ^2.0.63
+        version: 2.0.63(zod@3.25.76)
       '@ajosecortes/guardian-cli':
         specifier: ^1.2.1
         version: 1.2.1(@types/react@19.1.12)
@@ -176,6 +188,24 @@ packages:
 
   '@ai-sdk/gateway@3.0.151':
     resolution: {integrity: sha512-gsKEm1LleR/xm1FiJjnNxf1ZUKZryj20STsKJB7TdMcaiRqQgeHrdYWv/DNSA8ZBkRahHC+wEYHaI0VR9/EOwQ==}
+    engines: {node: '>=18'}
+    peerDependencies:
+      zod: ^3.25.76 || ^4.1.8
+
+  '@ai-sdk/google@3.0.103':
+    resolution: {integrity: sha512-i/I92bfAeRPBvAwrW052NmPTkc+ZgVYs3vZjGhHgReE04cV37xJtbhZgr6U3CZKDArIAN0NhL0GoLpZ7FYV+dA==}
+    engines: {node: '>=18'}
+    peerDependencies:
+      zod: ^3.25.76 || ^4.1.8
+
+  '@ai-sdk/openai-compatible@2.0.63':
+    resolution: {integrity: sha512-EmrD7iRboidulu6yHfMiMhd6RQSw8KrIWhNLK8vl5brQZbIjXkyhUU+FULZM3P4m46Vatzx8u3vX1w/qmFUmqA==}
+    engines: {node: '>=18'}
+    peerDependencies:
+      zod: ^3.25.76 || ^4.1.8
+
+  '@ai-sdk/openai@3.0.90':
+    resolution: {integrity: sha512-GIucFshCN7JZwTDur25PsnLEMRUFfAKuLaA9TP9fzGxPC2Zxzl94tvat93ZdZLURkKOrDukU0E4fj73tKDWjTA==}
     engines: {node: '>=18'}
     peerDependencies:
       zod: ^3.25.76 || ^4.1.8
@@ -5576,6 +5606,7 @@ packages:
 
   onnxruntime-node@1.21.0:
     resolution: {integrity: sha512-NeaCX6WW2L8cRCSqy3bInlo5ojjQqu2fD3D+9W5qb5irwxhEyWKXeH2vZ8W9r6VxaMPUan+4/7NDwZMtouZxEw==}
+    os: [win32, darwin, linux]
 
   onnxruntime-web@1.22.0-dev.20250409-89f8206ba4:
     resolution: {integrity: sha512-0uS76OPgH0hWCPrFKlL8kYVV7ckM7t/36HfbgoFw6Nd0CZVVbQC4PkrR8mBX8LtNUFZO25IQBqV2Hx2ho3FlbQ==}
@@ -7215,6 +7246,24 @@ snapshots:
       '@vercel/oidc': 3.2.0
       zod: 3.25.76
 
+  '@ai-sdk/google@3.0.103(zod@3.25.76)':
+    dependencies:
+      '@ai-sdk/provider': 3.0.14
+      '@ai-sdk/provider-utils': 4.0.39(zod@3.25.76)
+      zod: 3.25.76
+
+  '@ai-sdk/openai-compatible@2.0.63(zod@3.25.76)':
+    dependencies:
+      '@ai-sdk/provider': 3.0.14
+      '@ai-sdk/provider-utils': 4.0.39(zod@3.25.76)
+      zod: 3.25.76
+
+  '@ai-sdk/openai@3.0.90(zod@3.25.76)':
+    dependencies:
+      '@ai-sdk/provider': 3.0.14
+      '@ai-sdk/provider-utils': 4.0.39(zod@3.25.76)
+      zod: 3.25.76
+
   '@ai-sdk/provider-utils@4.0.39(zod@3.25.76)':
     dependencies:
       '@ai-sdk/provider': 3.0.14
@@ -7230,9 +7279,9 @@ snapshots:
     dependencies:
       commander: 12.1.0
       ink: 7.0.3(@types/react@19.1.12)(react@19.2.6)
-      ink-select-input: 6.2.0(ink@7.0.3(@types/react@19.1.12)(react@19.2.6))(react@19.2.6)
-      ink-spinner: 5.0.0(ink@7.0.3(@types/react@19.1.12)(react@19.2.6))(react@19.2.6)
-      ink-text-input: 6.0.0(ink@7.0.3(@types/react@19.1.12)(react@19.2.6))(react@19.2.6)
+      ink-select-input: 6.2.0(ink@7.0.3(@types/react@19.1.12)(react@19.1.1))(react@19.2.6)
+      ink-spinner: 5.0.0(ink@7.0.3(@types/react@19.1.12)(react@19.1.1))(react@19.2.6)
+      ink-text-input: 6.0.0(ink@7.0.3(@types/react@19.1.12)(react@19.1.1))(react@19.2.6)
       micromatch: 4.0.8
       react: 19.2.6
     transitivePeerDependencies:
@@ -12106,20 +12155,20 @@ snapshots:
 
   inherits@2.0.4: {}
 
-  ink-select-input@6.2.0(ink@7.0.3(@types/react@19.1.12)(react@19.2.6))(react@19.2.6):
+  ink-select-input@6.2.0(ink@7.0.3(@types/react@19.1.12)(react@19.1.1))(react@19.2.6):
     dependencies:
       figures: 6.1.0
       ink: 7.0.3(@types/react@19.1.12)(react@19.2.6)
       react: 19.2.6
       to-rotated: 1.0.0
 
-  ink-spinner@5.0.0(ink@7.0.3(@types/react@19.1.12)(react@19.2.6))(react@19.2.6):
+  ink-spinner@5.0.0(ink@7.0.3(@types/react@19.1.12)(react@19.1.1))(react@19.2.6):
     dependencies:
       cli-spinners: 2.9.2
       ink: 7.0.3(@types/react@19.1.12)(react@19.2.6)
       react: 19.2.6
 
-  ink-text-input@6.0.0(ink@7.0.3(@types/react@19.1.12)(react@19.2.6))(react@19.2.6):
+  ink-text-input@6.0.0(ink@7.0.3(@types/react@19.1.12)(react@19.1.1))(react@19.2.6):
     dependencies:
       chalk: 5.6.2
       ink: 7.0.3(@types/react@19.1.12)(react@19.2.6)

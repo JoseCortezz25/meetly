@@ -13,8 +13,26 @@ export const settingsMessages = {
   },
   notes: {
     title: 'AI Notes',
+    languageLabel: 'Language',
+    languageHint:
+      'The language the generated notes are written in. "Same as transcript" keeps the meeting\'s own language.',
+    engineLabel: 'Engine',
+    engineHint:
+      'Generate notes on-device, or use a hosted provider with your own API key. Your key is stored only in this browser and calls run from your device — nothing is sent to a Meetly server.',
+    engineOptions: {
+      local: 'On-device',
+      remote: 'API key'
+    },
     modelLabel: 'Model',
     modelHint:
-      'The on-device language model that writes your meeting notes. Larger models produce better notes but need more memory and time.'
+      'The on-device language model that writes your meeting notes. Larger models produce better notes but need more memory and time.',
+    providerLabel: 'Provider',
+    providerHint: 'Which hosted provider generates your notes.',
+    remoteModelLabel: 'Model',
+    remoteModelHint: 'Only fast, current models are offered.',
+    apiKeyLabel: 'API key',
+    apiKeyPlaceholder: 'Paste your API key',
+    apiKeyHint: 'Get an API key',
+    apiKeyStored: 'Stored in this browser only.'
   }
 } as const;

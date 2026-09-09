@@ -1,5 +1,12 @@
+import type { LanguageModel } from 'ai';
 import type { WebLLMLanguageModel, WebLLMProgress } from '@browser-ai/web-llm';
-import { getNotesModelId } from '@/lib/notes-settings';
+import {
+  getNotesLanguage,
+  getNotesModelId,
+  getResolvedNotesEngine,
+  type ResolvedNotesEngine
+} from '@/lib/notes-settings';
+import { createRemoteNotesModel } from './notes-providers.service';
 import {
   chunkTranscriptTurns,
   estimateTokens,
@@ -7,6 +14,10 @@ import {
   groupTextsByBudget,
   NOTES_INPUT_BUDGET_TOKENS
 } from '../utils/notes-chunking.util';
+import {
+  buildNotesSystemPrompts,
+  type NotesSystemPrompts
+} from '../utils/notes-prompts.util';
 import type {
   ActionItem,
   MeetingNotes,
@@ -24,46 +35,6 @@ export class NotesError extends Error {
     this.name = 'NotesError';
   }
 }
-
-const NOTES_FORMAT = [
-  'Output ONLY the four sections below, with these exact headers and nothing else:',
-  '',
-  '## Summary',
-  '<one short paragraph, 2-4 sentences>',
-  '',
-  '## Key points',
-  '- <point>',
-  '',
-  '## Action items',
-  '- <task> :: <owner or -> :: <due or ->',
-  '',
-  '## Decisions',
-  '- <decision>',
-  '',
-  'Rules: do not invent details that are not in the transcript. If a section has no content, write "- none".'
-].join('\n');
-
-const SYSTEM_PROMPT = [
-  'You are a meeting-notes assistant. Read the meeting transcript and produce concise, factual notes.',
-  'Write in the SAME LANGUAGE as the transcript.',
-  NOTES_FORMAT
-].join('\n');
-
-/** Map phase: notes for ONE portion of a longer transcript, same four sections. */
-const CHUNK_SYSTEM_PROMPT = [
-  'You are a meeting-notes assistant. You will receive ONE portion of a longer meeting transcript.',
-  'Produce concise, factual notes covering ONLY this portion. Be brief — these notes will be merged with notes from the other portions later.',
-  'Write in the SAME LANGUAGE as the transcript.',
-  NOTES_FORMAT
-].join('\n');
-
-/** Reduce phase: merge partial notes from consecutive portions into one set. */
-const MERGE_SYSTEM_PROMPT = [
-  'You are a meeting-notes assistant. You will receive partial meeting notes taken from consecutive portions of ONE meeting.',
-  'Combine them into a single set of notes: merge overlapping items, remove duplicates, and keep every distinct point.',
-  'Write in the SAME LANGUAGE as the partial notes.',
-  NOTES_FORMAT
-].join('\n');
 
 type GenerateNotesOptions = {
   onProgress?: (progress: NotesGenerationProgress) => void;
@@ -179,12 +150,18 @@ const isContextOverflowError = (error: unknown): boolean => {
   return isContextOverflowError(error.cause);
 };
 
-const toNotesError = (error: unknown): NotesError => {
+const toNotesError = (error: unknown, isRemote: boolean): NotesError => {
   if (error instanceof NotesError) return error;
   if (isContextOverflowError(error)) {
     return new NotesError(
       'context-overflow',
       'The prompt exceeded the model context window.'
+    );
+  }
+  if (isRemote) {
+    return new NotesError(
+      'provider-error',
+      'The AI provider failed while generating notes.'
     );
   }
   return new NotesError('unknown', 'The model failed while generating notes.');
@@ -198,6 +175,7 @@ const toNotesError = (error: unknown): NotesError => {
  */
 let notesEngine: WebLLMLanguageModel | null = null;
 let notesEngineModelId: string | null = null;
+let notesEngineWorker: Worker | null = null;
 
 /**
  * Progress listener for the currently active generation. The engine's
@@ -224,8 +202,18 @@ const getNotesEngine = async (): Promise<WebLLMLanguageModel> => {
 
   const modelId = getNotesModelId();
   if (!notesEngine || notesEngineModelId !== modelId) {
+    // Terminate the previous worker first so the old model releases its
+    // GPU/CPU memory before the new one loads.
+    notesEngineWorker?.terminate();
+    // Inference runs inside a Web Worker so model loading and token generation
+    // never block the main thread during long map-reduce generations.
+    notesEngineWorker = new Worker(
+      new URL('../workers/notes-engine.worker.ts', import.meta.url),
+      { type: 'module' }
+    );
     notesEngine = webLLM(modelId, {
-      initProgressCallback: report => currentProgressListener?.(report)
+      initProgressCallback: report => currentProgressListener?.(report),
+      worker: notesEngineWorker
     });
     notesEngineModelId = modelId;
   }
@@ -237,6 +225,8 @@ type GenerationPassOptions = {
   system: string;
   prompt: string;
   signal?: AbortSignal;
+  /** Remote passes map unknown failures to a provider-specific error. */
+  isRemote?: boolean;
   /** Receives the accumulated text after each delta (final pass only). */
   onDelta?: (accumulated: string) => void;
 };
@@ -247,8 +237,8 @@ type GenerationPassOptions = {
  * instead of throwing, so the error must be collected and re-thrown per call.
  */
 const runGenerationPass = async (
-  model: WebLLMLanguageModel,
-  { system, prompt, signal, onDelta }: GenerationPassOptions
+  model: LanguageModel,
+  { system, prompt, signal, isRemote = false, onDelta }: GenerationPassOptions
 ): Promise<string> => {
   const { streamText } = await import('ai');
 
@@ -269,7 +259,7 @@ const runGenerationPass = async (
     onDelta?.(accumulated);
   }
 
-  if (streamError) throw toNotesError(streamError);
+  if (streamError) throw toNotesError(streamError, isRemote);
   return accumulated;
 };
 
@@ -281,8 +271,9 @@ const runGenerationPass = async (
  * UI never renders partial-notes garbage.
  */
 const generateNotesChunked = async (
-  model: WebLLMLanguageModel,
+  model: LanguageModel,
   transcript: TranscriptTurn[],
+  prompts: NotesSystemPrompts,
   { onProgress, onText, signal }: GenerateNotesOptions
 ): Promise<string> => {
   const chunks = chunkTranscriptTurns(transcript, NOTES_INPUT_BUDGET_TOKENS);
@@ -298,7 +289,7 @@ const generateNotesChunked = async (
     });
     partials.push(
       await runGenerationPass(model, {
-        system: CHUNK_SYSTEM_PROMPT,
+        system: prompts.chunk,
         prompt: buildPrompt(chunk),
         signal
       })
@@ -328,7 +319,7 @@ const generateNotesChunked = async (
         group.length === 1
           ? group[0]
           : await runGenerationPass(model, {
-              system: MERGE_SYSTEM_PROMPT,
+              system: prompts.merge,
               prompt: buildMergePrompt(group),
               signal
             })
@@ -341,7 +332,7 @@ const generateNotesChunked = async (
   signal?.throwIfAborted();
   onProgress?.({ stage: 'combining', progress: 1 });
   return runGenerationPass(model, {
-    system: MERGE_SYSTEM_PROMPT,
+    system: prompts.merge,
     prompt: buildMergePrompt(merged),
     signal,
     onDelta: onText
@@ -349,17 +340,49 @@ const generateNotesChunked = async (
 };
 
 /**
- * Generates meeting notes from a transcript, fully on-device via WebLLM.
- * Reuses the shared model, so only the first note pays the load cost.
- * Transcripts that fit the context window run in a single streamed pass;
- * longer ones fall back to map-reduce summarization over transcript chunks.
+ * Generates notes through a remote provider (Vercel AI SDK) using the user's
+ * API key. Remote models have large context windows, so the whole transcript
+ * runs in a single streamed pass — no on-device chunking / map-reduce.
  */
-export const generateNotes = async (
+const generateNotesRemote = async (
+  engine: Extract<ResolvedNotesEngine, { mode: 'remote' }>,
   transcript: TranscriptTurn[],
-  { onProgress, onText, signal }: GenerateNotesOptions = {}
+  prompts: NotesSystemPrompts,
+  { onProgress, onText, signal }: GenerateNotesOptions
+): Promise<MeetingNotes> => {
+  if (!engine.apiKey.trim()) {
+    throw new NotesError(
+      'api-key-missing',
+      'No API key configured for the selected provider.'
+    );
+  }
+  const model = createRemoteNotesModel(
+    engine.provider,
+    engine.model,
+    engine.apiKey
+  );
+  onProgress?.({ stage: 'generating', progress: 1 });
+  const raw = await runGenerationPass(model, {
+    system: prompts.single,
+    prompt: buildPrompt(transcript),
+    signal,
+    isRemote: true,
+    onDelta: onText
+  });
+  return parseNotes(raw);
+};
+
+/**
+ * Generates notes fully on-device via WebLLM. Reuses the shared engine, so only
+ * the first note pays the load cost. Transcripts that fit the context window
+ * run in a single streamed pass; longer ones fall back to map-reduce chunking.
+ */
+const generateNotesLocal = async (
+  transcript: TranscriptTurn[],
+  prompts: NotesSystemPrompts,
+  { onProgress, onText, signal }: GenerateNotesOptions
 ): Promise<MeetingNotes> => {
   const model = await getNotesEngine();
-
   const progressListener = (report: WebLLMProgress) =>
     onProgress?.({
       stage: 'loading',
@@ -373,16 +396,15 @@ export const generateNotes = async (
     let raw: string;
 
     if (estimateTokens(fullPrompt) <= NOTES_INPUT_BUDGET_TOKENS) {
-      // Fast path: the whole transcript fits in one pass, streamed to the UI.
       onProgress?.({ stage: 'generating', progress: 1 });
       raw = await runGenerationPass(model, {
-        system: SYSTEM_PROMPT,
+        system: prompts.single,
         prompt: fullPrompt,
         signal,
         onDelta: onText
       });
     } else {
-      raw = await generateNotesChunked(model, transcript, {
+      raw = await generateNotesChunked(model, transcript, prompts, {
         onProgress,
         onText,
         signal
@@ -396,4 +418,22 @@ export const generateNotes = async (
       currentProgressListener = null;
     }
   }
+};
+
+/**
+ * Generates meeting notes from a transcript. Runs on-device via WebLLM by
+ * default; if the user configured a remote provider + API key in Settings, it
+ * runs through that provider (browser-side, using the user's own key). Language
+ * and engine are resolved per call so a Settings change applies to the next run.
+ */
+export const generateNotes = async (
+  transcript: TranscriptTurn[],
+  options: GenerateNotesOptions = {}
+): Promise<MeetingNotes> => {
+  const prompts = buildNotesSystemPrompts(getNotesLanguage());
+  const engine = getResolvedNotesEngine();
+
+  return engine.mode === 'remote'
+    ? generateNotesRemote(engine, transcript, prompts, options)
+    : generateNotesLocal(transcript, prompts, options);
 };
