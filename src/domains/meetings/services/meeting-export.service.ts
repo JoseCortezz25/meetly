@@ -1,5 +1,8 @@
 import { slugify } from '@/utils/slug.util';
-import type { MeetingDetail } from '../types/meeting-detail.types';
+import type {
+  MeetingDetail,
+  TranscriptTurn
+} from '../types/meeting-detail.types';
 
 const triggerDownload = (blob: Blob, filename: string): void => {
   const url = URL.createObjectURL(blob);
@@ -71,6 +74,18 @@ export const transcriptToMarkdown = (meeting: MeetingDetail): string => {
   });
   return lines.join('\n');
 };
+
+/**
+ * Plain-text transcript for the clipboard — one line per turn, no markdown
+ * decoration so it pastes cleanly into any document or chat.
+ */
+export const transcriptToPlainText = (transcript: TranscriptTurn[]): string =>
+  transcript
+    .map(turn => {
+      const speaker = turn.speaker ? `${turn.speaker}: ` : '';
+      return `${turn.time}  ${speaker}${turn.text}`;
+    })
+    .join('\n');
 
 export const exportNotes = (meeting: MeetingDetail): void => {
   const content = notesToMarkdown(meeting);

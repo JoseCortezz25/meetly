@@ -3,6 +3,7 @@ import { cn } from '@/lib/utils';
 import { LevelMeter } from '../atoms/level-meter';
 import { LiveWaveform } from '../atoms/live-waveform';
 import { Waveform } from '../atoms/waveform';
+import { usePeakDb } from '../../hooks/use-peak-db';
 import { channelMeta, formatPeakDb, recordingMessages } from '../../messages';
 import type { ChannelKind } from '../../types/recording.types';
 
@@ -14,6 +15,8 @@ type CaptureChannelProps = {
   muteLabel: string;
   /** Live audio source; when present the waveform/meter read real audio. */
   analyser?: AnalyserNode | null;
+  /** Real capture-source name; falls back to a placeholder in the idle preview. */
+  deviceLabel?: string | null;
   onToggleMute: () => void;
 };
 
@@ -44,6 +47,7 @@ export const CaptureChannel = ({
   isActive,
   muteLabel,
   analyser,
+  deviceLabel,
   onToggleMute
 }: CaptureChannelProps) => {
   const meta = channelMeta[channel];
@@ -53,6 +57,8 @@ export const CaptureChannel = ({
   const muteText = isMuted
     ? recordingMessages.channel.unmute
     : recordingMessages.channel.mute;
+  const peakDb = usePeakDb(analyser, isActive);
+  const sourceLabel = deviceLabel ?? meta.sourcePlaceholder;
 
   return (
     <div
@@ -75,8 +81,11 @@ export const CaptureChannel = ({
             <strong className="text-cream text-[15px] font-semibold">
               {meta.title}
             </strong>
-            <small className="text-sand text-[12.5px] leading-tight">
-              {meta.source}
+            <small
+              className="text-sand line-clamp-2 text-[12.5px] leading-tight"
+              title={sourceLabel}
+            >
+              {sourceLabel}
             </small>
           </span>
         </div>
@@ -95,7 +104,7 @@ export const CaptureChannel = ({
             {muteText}
           </button>
           <span className="text-sand-2 font-mono text-[12.5px] tabular-nums">
-            {formatPeakDb(meta.peakDb)}
+            {formatPeakDb(peakDb)}
           </span>
         </div>
       </div>

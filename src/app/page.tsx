@@ -2,23 +2,10 @@ import { DashboardHeader } from '@/domains/meetings/components/organisms/dashboa
 import { QuickStartHero } from '@/domains/meetings/components/organisms/quick-start-hero';
 import { RecentMeetings } from '@/domains/meetings/components/organisms/recent-meetings';
 import { dashboardMessages } from '@/domains/meetings/messages';
-
-const resolveGreeting = (hour: number): string => {
-  if (hour < 12) return dashboardMessages.greeting.morning;
-  if (hour < 18) return dashboardMessages.greeting.afternoon;
-  return dashboardMessages.greeting.evening;
-};
-
-const formatDateLabel = (date: Date): string => {
-  const weekday = new Intl.DateTimeFormat('en-US', { weekday: 'long' }).format(
-    date
-  );
-  const dayMonth = new Intl.DateTimeFormat('en-GB', {
-    day: 'numeric',
-    month: 'long'
-  }).format(date);
-  return `${weekday}, ${dayMonth}`;
-};
+import {
+  formatDateLabel,
+  resolveGreetingKey
+} from '@/domains/meetings/utils/greeting.util';
 
 export default function Home() {
   const now = new Date();
@@ -27,7 +14,9 @@ export default function Home() {
     <main className="relative z-[2] mx-auto max-w-[1180px] px-4 pt-[26px] pb-[60px] sm:px-[34px]">
       <DashboardHeader
         dateLabel={formatDateLabel(now)}
-        greeting={resolveGreeting(now.getHours())}
+        greeting={
+          dashboardMessages.greeting[resolveGreetingKey(now.getHours())]
+        }
       />
       <QuickStartHero />
       <RecentMeetings />

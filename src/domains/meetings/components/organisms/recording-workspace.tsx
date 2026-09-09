@@ -25,6 +25,7 @@ export const RecordingWorkspace = () => {
     channels,
     muted,
     analysers,
+    channelLabels,
     timecode,
     errorCode,
     result,
@@ -98,6 +99,7 @@ export const RecordingWorkspace = () => {
             channels={channels}
             muted={muted}
             analysers={analysers}
+            labels={channelLabels}
             onSelectMode={selectMode}
             onToggleMute={toggleMute}
           />

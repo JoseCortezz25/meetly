@@ -28,6 +28,8 @@ type ChannelNodes = {
   source: MediaStreamAudioSourceNode;
   gain: GainNode;
   analyser: AnalyserNode;
+  /** Real capture-source name reported by the browser (device or shared tab). */
+  label: string;
 };
 
 /**
@@ -134,7 +136,8 @@ export class RecordingEngine {
     if (!audioContext || !destination) return;
 
     // Feed the graph from an audio-only stream so display video is ignored.
-    const audioStream = new MediaStream(stream.getAudioTracks());
+    const audioTracks = stream.getAudioTracks();
+    const audioStream = new MediaStream(audioTracks);
     const source = audioContext.createMediaStreamSource(audioStream);
     const gain = audioContext.createGain();
     const analyser = audioContext.createAnalyser();
@@ -145,11 +148,22 @@ export class RecordingEngine {
     gain.connect(analyser);
     analyser.connect(destination);
 
-    this.channels.set(channel, { stream, source, gain, analyser });
+    this.channels.set(channel, {
+      stream,
+      source,
+      gain,
+      analyser,
+      label: audioTracks[0]?.label ?? ''
+    });
   }
 
   getAnalyser(channel: ChannelKind): AnalyserNode | null {
     return this.channels.get(channel)?.analyser ?? null;
+  }
+
+  /** Real source name for this channel, or null if not capturing / unnamed. */
+  getTrackLabel(channel: ChannelKind): string | null {
+    return this.channels.get(channel)?.label || null;
   }
 
   setMuted(channel: ChannelKind, isMuted: boolean): void {

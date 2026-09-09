@@ -131,6 +131,7 @@ export const meetingDetailMessages = {
     owner: 'Owner:'
   },
   actions: {
+    regenerate: 'Regenerate notes',
     export: 'Export',
     exportNotes: 'Notes (.md)',
     exportTranscript: 'Transcript (.md)',
@@ -151,6 +152,12 @@ export const meetingDetailMessages = {
     channels: 'Channels',
     model: 'Model',
     language: 'Language'
+  },
+  transcriptCopy: {
+    label: 'Copy transcript',
+    copied: 'Copied',
+    error: 'Copy failed',
+    ariaLabel: 'Copy transcript to clipboard'
   },
   transcriptEmpty: 'No transcript for this meeting yet.',
   notesEmpty: 'AI notes for this meeting have not been generated yet.',
@@ -195,14 +202,21 @@ export const notesGeneratorMessages = {
       'AI notes need a WebGPU browser (Chrome 113+ or Edge). This browser is not supported.',
     contextOverflow:
       'This transcript is too long for the on-device model, even after splitting it into sections. Try a different model in Settings.',
+    apiKeyMissing:
+      'Add your provider API key in Settings to generate notes with a hosted model.',
+    providerError:
+      'The AI provider rejected the request. Check your API key and model in Settings, then try again.',
     unknown: 'Could not generate notes. Please try again.'
   },
-  retry: 'Try again'
+  retry: 'Try again',
+  cancel: 'Keep current notes'
 } as const;
 
 export const notesErrorLabels: Record<NotesErrorCode, string> = {
   'no-webgpu': notesGeneratorMessages.errors.noWebgpu,
   'context-overflow': notesGeneratorMessages.errors.contextOverflow,
+  'api-key-missing': notesGeneratorMessages.errors.apiKeyMissing,
+  'provider-error': notesGeneratorMessages.errors.providerError,
   unknown: notesGeneratorMessages.errors.unknown
 };
 
@@ -214,18 +228,21 @@ export const recordedMeetingDefaults = {
   language: 'Auto-detected'
 } as const;
 
-/** Static device metadata per channel (mocked until real capture is wired). */
+/**
+ * Per-channel labels. `title` is static; `sourcePlaceholder` shows in the idle
+ * preview, replaced by the real device/track label once capture starts.
+ */
 export const channelMeta: Record<
   ChannelKind,
-  { title: string; source: string; peakDb: number }
+  { title: string; sourcePlaceholder: string }
 > = {
-  mic: { title: 'Your mic', source: 'MacBook Pro Microphone', peakDb: -19 },
-  sys: {
-    title: 'System audio',
-    source: 'Shared tab · Google Meet',
-    peakDb: -32
-  }
+  mic: { title: 'Your mic', sourcePlaceholder: 'Microphone' },
+  sys: { title: 'System audio', sourcePlaceholder: 'Shared audio' }
 };
 
-/** Formats a peak level reading for display (e.g. -19 → "-19 dB"). */
-export const formatPeakDb = (peakDb: number): string => `${peakDb} dB`;
+/**
+ * Formats a live peak level for display (e.g. -19 → "-19 dB"). `null` means no
+ * active capture yet, shown as a neutral placeholder.
+ */
+export const formatPeakDb = (peakDb: number | null): string =>
+  peakDb === null ? '— dB' : `${Math.round(peakDb)} dB`;

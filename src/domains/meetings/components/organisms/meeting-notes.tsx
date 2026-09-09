@@ -35,16 +35,42 @@ export const MeetingNotesSection = ({
 }: MeetingNotesSectionProps) => {
   const [activeTab, setActiveTab] = useState<NotesTab>('notes');
   const [notes, setNotes] = useState<MeetingNotes>(initialNotes);
+  const [isRegenerating, setIsRegenerating] = useState(false);
 
   const handleGenerated = (generated: MeetingNotes) => {
     setNotes(generated);
+    setIsRegenerating(false);
     void updateStoredMeetingNotes(meetingId, generated);
   };
 
+  const handleRegenerate = () => setIsRegenerating(true);
+
+  // Canceling (or aborting) a regeneration keeps the existing notes: they are
+  // only replaced — in state and in storage — once a new generation succeeds.
+  const handleRegenerateCancel = () => setIsRegenerating(false);
+
   const canGenerate = isStored && transcript.length > 0 && notesAreEmpty(notes);
+  const canRegenerate =
+    isStored && transcript.length > 0 && !notesAreEmpty(notes);
 
   const renderNotes = () => {
-    if (!notesAreEmpty(notes)) return <AiNotesPanel notes={notes} />;
+    if (isRegenerating) {
+      return (
+        <NotesGenerator
+          transcript={transcript}
+          onGenerated={handleGenerated}
+          onCancel={handleRegenerateCancel}
+        />
+      );
+    }
+    if (!notesAreEmpty(notes)) {
+      return (
+        <AiNotesPanel
+          notes={notes}
+          onRegenerate={canRegenerate ? handleRegenerate : undefined}
+        />
+      );
+    }
     if (canGenerate) {
       return (
         <NotesGenerator transcript={transcript} onGenerated={handleGenerated} />

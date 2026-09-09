@@ -4,15 +4,33 @@ import {
   TRANSCRIPTION_LANGUAGES,
   TRANSCRIPTION_MODELS
 } from '@/lib/transcription-settings';
-import { NOTES_MODELS } from '@/lib/notes-settings';
+import {
+  NOTES_LANGUAGES,
+  NOTES_MODELS,
+  REMOTE_NOTES_PROVIDERS,
+  findRemoteProvider,
+  type NotesEngineMode,
+  type RemoteNotesProviderId
+} from '@/lib/notes-settings';
 import { useTranscriptionSettings } from '../../hooks/use-transcription-settings';
 import { useNotesSettings } from '../../hooks/use-notes-settings';
 import { OptionChips } from '../molecules/option-chips';
+import { ApiKeyField } from '../molecules/api-key-field';
 import { settingsMessages } from '../../messages';
 
 const LANGUAGE_OPTIONS = TRANSCRIPTION_LANGUAGES.map(option => ({
   id: option.code,
   label: option.label
+}));
+
+const NOTES_LANGUAGE_OPTIONS = NOTES_LANGUAGES.map(option => ({
+  id: option.code,
+  label: option.label
+}));
+
+const PROVIDER_OPTIONS = REMOTE_NOTES_PROVIDERS.map(provider => ({
+  id: provider.id,
+  label: provider.label
 }));
 
 export const SettingsPanel = () => {
@@ -22,9 +40,29 @@ export const SettingsPanel = () => {
     model: transcriptionModel,
     setModel: setTranscriptionModel
   } = useTranscriptionSettings();
-  const { model: notesModel, setModel: setNotesModel } = useNotesSettings();
+  const {
+    model: notesModel,
+    setModel: setNotesModel,
+    language: notesLanguage,
+    setLanguage: setNotesLanguage,
+    mode,
+    setMode,
+    provider,
+    setProvider,
+    remoteModel,
+    setRemoteModel,
+    apiKey,
+    setApiKey
+  } = useNotesSettings();
 
   const { transcription, notes } = settingsMessages;
+
+  const ENGINE_OPTIONS = [
+    { id: 'local', label: notes.engineOptions.local },
+    { id: 'remote', label: notes.engineOptions.remote }
+  ];
+
+  const activeProvider = findRemoteProvider(provider);
 
   return (
     <section>
@@ -80,17 +118,100 @@ export const SettingsPanel = () => {
           </p>
 
           <h2 className="text-cream text-[15px] font-semibold">
-            {notes.modelLabel}
+            {notes.languageLabel}
           </h2>
           <p className="text-sand mt-1 mb-4 text-[13.5px] leading-[1.5]">
-            {notes.modelHint}
+            {notes.languageHint}
           </p>
           <OptionChips
-            options={NOTES_MODELS}
-            value={notesModel}
-            ariaLabel={notes.modelLabel}
-            onChange={setNotesModel}
+            options={NOTES_LANGUAGE_OPTIONS}
+            value={notesLanguage}
+            ariaLabel={notes.languageLabel}
+            onChange={setNotesLanguage}
           />
+
+          <hr className="border-line my-6" />
+
+          <h2 className="text-cream text-[15px] font-semibold">
+            {notes.engineLabel}
+          </h2>
+          <p className="text-sand mt-1 mb-4 text-[13.5px] leading-[1.5]">
+            {notes.engineHint}
+          </p>
+          <OptionChips
+            options={ENGINE_OPTIONS}
+            value={mode}
+            ariaLabel={notes.engineLabel}
+            onChange={id => setMode(id as NotesEngineMode)}
+          />
+
+          <hr className="border-line my-6" />
+
+          {mode === 'local' ? (
+            <>
+              <h2 className="text-cream text-[15px] font-semibold">
+                {notes.modelLabel}
+              </h2>
+              <p className="text-sand mt-1 mb-4 text-[13.5px] leading-[1.5]">
+                {notes.modelHint}
+              </p>
+              <OptionChips
+                options={NOTES_MODELS}
+                value={notesModel}
+                ariaLabel={notes.modelLabel}
+                onChange={setNotesModel}
+              />
+            </>
+          ) : (
+            <>
+              <h2 className="text-cream text-[15px] font-semibold">
+                {notes.providerLabel}
+              </h2>
+              <p className="text-sand mt-1 mb-4 text-[13.5px] leading-[1.5]">
+                {notes.providerHint}
+              </p>
+              <OptionChips
+                options={PROVIDER_OPTIONS}
+                value={provider}
+                ariaLabel={notes.providerLabel}
+                onChange={id => setProvider(id as RemoteNotesProviderId)}
+              />
+
+              <h2 className="text-cream mt-6 text-[15px] font-semibold">
+                {notes.remoteModelLabel}
+              </h2>
+              <p className="text-sand mt-1 mb-4 text-[13.5px] leading-[1.5]">
+                {notes.remoteModelHint}
+              </p>
+              <OptionChips
+                options={activeProvider.models}
+                value={remoteModel}
+                ariaLabel={notes.remoteModelLabel}
+                onChange={setRemoteModel}
+              />
+
+              <h2 className="text-cream mt-6 text-[15px] font-semibold">
+                {notes.apiKeyLabel}
+              </h2>
+              <p className="text-sand mt-1 mb-3 text-[13.5px] leading-[1.5]">
+                {notes.apiKeyStored}{' '}
+                <a
+                  href={activeProvider.apiKeyUrl}
+                  target="_blank"
+                  rel="noreferrer"
+                  className="text-cream underline underline-offset-2"
+                >
+                  {notes.apiKeyHint}
+                </a>
+              </p>
+              <ApiKeyField
+                value={apiKey}
+                placeholder={notes.apiKeyPlaceholder}
+                ariaLabel={`${activeProvider.label} ${notes.apiKeyLabel}`}
+                onChange={setApiKey}
+              />
+            </>
+          )}
         </div>
       </div>
     </section>

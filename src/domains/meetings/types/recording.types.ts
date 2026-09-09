@@ -21,6 +21,9 @@ export type ChannelMuteState = Record<ChannelKind, boolean>;
 /** Live AnalyserNode per channel, or null when no capture is running. */
 export type ChannelAnalysers = Record<ChannelKind, AnalyserNode | null>;
 
+/** Real capture-source name per channel, or null when no capture is running. */
+export type ChannelLabels = Record<ChannelKind, string | null>;
+
 /** Elapsed time split into display parts for the timecode. */
 export type Timecode = {
   minutes: string;
