@@ -4,19 +4,22 @@ import { RecentMeetings } from '@/domains/meetings/components/organisms/recent-m
 import { dashboardMessages } from '@/domains/meetings/messages';
 import {
   formatDateLabel,
-  resolveGreetingKey
+  resolveGreetingKey,
+  selectGreeting
 } from '@/domains/meetings/utils/greeting.util';
 
 export default function Home() {
   const now = new Date();
+  // Deterministic first-paint fallback; the client recomputes a varied phrase
+  // from the browser clock after mount.
+  const greetingPhrases =
+    dashboardMessages.greeting[resolveGreetingKey(now.getHours())];
 
   return (
     <main className="relative z-[2] mx-auto max-w-[1180px] px-4 pt-[26px] pb-[60px] sm:px-[34px]">
       <DashboardHeader
         dateLabel={formatDateLabel(now)}
-        greeting={
-          dashboardMessages.greeting[resolveGreetingKey(now.getHours())]
-        }
+        greeting={selectGreeting(greetingPhrases, 0)}
       />
       <QuickStartHero />
       <RecentMeetings />

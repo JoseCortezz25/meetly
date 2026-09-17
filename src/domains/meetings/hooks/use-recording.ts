@@ -35,6 +35,8 @@ import type {
 const TICK_INTERVAL_MS = 60;
 const NO_ANALYSERS: ChannelAnalysers = { mic: null, sys: null };
 const NO_LABELS: ChannelLabels = { mic: null, sys: null };
+/** Below this, an auto-stop discards instead of transcribing near-empty audio. */
+const MIN_RECORDING_MS = 3000;
 
 type RecordingState = {
   mode: AudioMode | null;
@@ -48,6 +50,10 @@ type RecordingState = {
   liveSegments: TranscriptTurn[];
   processingFailed: boolean;
   savedMeetingId: string | null;
+  /** A channel ended on its own but other channels keep recording. */
+  warningChannel: ChannelKind | null;
+  /** The session stopped by itself because every active channel ended. */
+  autoStopped: boolean;
 };
 
 type RecordingAction =
@@ -66,6 +72,9 @@ type RecordingAction =
   | { type: 'saved'; meetingId: string }
   | { type: 'reset' }
   | { type: 'toggleMute'; channel: ChannelKind }
+  | { type: 'channelWarning'; channel: ChannelKind }
+  | { type: 'autoStopped' }
+  | { type: 'autoDiscard' }
   | { type: 'tick'; deltaMs: number };
 
 const initialState: RecordingState = {
@@ -79,7 +88,9 @@ const initialState: RecordingState = {
   transcription: null,
   liveSegments: [],
   processingFailed: false,
-  savedMeetingId: null
+  savedMeetingId: null,
+  warningChannel: null,
+  autoStopped: false
 };
 
 const channelsForMode = (mode: AudioMode | null): ChannelKind[] => {
@@ -185,7 +196,9 @@ const recordingReducer = (
         ...state,
         status: 'recording',
         elapsedMs: 0,
-        muted: initialState.muted
+        muted: initialState.muted,
+        warningChannel: null,
+        autoStopped: false
       };
     case 'failed':
       return { ...state, status: 'idle', errorCode: action.errorCode };
@@ -233,6 +246,20 @@ const recordingReducer = (
           [action.channel]: !state.muted[action.channel]
         }
       };
+    case 'channelWarning':
+      if (state.status !== 'recording' && state.status !== 'paused')
+        return state;
+      return { ...state, warningChannel: action.channel };
+    case 'autoStopped':
+      return { ...state, autoStopped: true, warningChannel: null };
+    case 'autoDiscard':
+      // Source ended before there was anything worth keeping — back to idle.
+      return {
+        ...initialState,
+        mode: state.mode,
+        meetingName: state.meetingName,
+        errorCode: 'source-ended'
+      };
     case 'tick':
       if (state.status !== 'recording') return state;
       return { ...state, elapsedMs: state.elapsedMs + action.deltaMs };
@@ -249,6 +276,12 @@ export const useRecording = () => {
   const [analysers, setAnalysers] = useState<ChannelAnalysers>(NO_ANALYSERS);
   const [channelLabels, setChannelLabels] = useState<ChannelLabels>(NO_LABELS);
   const engineRef = useRef<RecordingEngine | null>(null);
+  const endedChannelsRef = useRef<Set<ChannelKind>>(new Set());
+  // Holds the latest channel-ended handler so the engine callback (bound once in
+  // start) always runs against current state without re-subscribing.
+  const handleChannelEndedRef = useRef<(channel: ChannelKind) => void>(
+    () => {}
+  );
   const {
     mode,
     status,
@@ -260,7 +293,9 @@ export const useRecording = () => {
     transcription,
     liveSegments,
     processingFailed,
-    savedMeetingId
+    savedMeetingId,
+    warningChannel,
+    autoStopped
   } = state;
 
   useEffect(() => {
@@ -326,6 +361,11 @@ export const useRecording = () => {
     try {
       await engine.start(mode);
       engineRef.current = engine;
+      endedChannelsRef.current = new Set();
+      // Stable wrapper reads the latest handler via ref, so it never goes stale.
+      engine.setOnChannelEnded(channel =>
+        handleChannelEndedRef.current(channel)
+      );
       setAnalysers({
         mic: engine.getAnalyser('mic'),
         sys: engine.getAnalyser('sys')
@@ -367,6 +407,40 @@ export const useRecording = () => {
     dispatch({ type: 'processing', result: recording });
     void runTranscription(recording, mode, meetingName);
   }, [mode, elapsedMs, meetingName, runTranscription]);
+
+  // A captured track ended on its own (share stopped, tab closed). Reassigned
+  // each render so it sees current state and the latest `stop`.
+  handleChannelEndedRef.current = (channel: ChannelKind) => {
+    if (status !== 'recording' && status !== 'paused') return;
+    endedChannelsRef.current.add(channel);
+
+    const active = channelsForMode(mode);
+    const allEnded =
+      active.length > 0 &&
+      active.every(current => endedChannelsRef.current.has(current));
+
+    // Some channels survive (e.g. mix mode, only system audio dropped): warn
+    // and keep recording the rest instead of throwing away a valid session.
+    if (!allEnded) {
+      dispatch({ type: 'channelWarning', channel });
+      return;
+    }
+
+    // Ended within the first seconds: transcribing near-empty audio is worse
+    // than discarding, so drop it and return to idle with a reason.
+    if (elapsedMs < MIN_RECORDING_MS) {
+      engineRef.current?.dispose();
+      engineRef.current = null;
+      setAnalysers(NO_ANALYSERS);
+      setChannelLabels(NO_LABELS);
+      dispatch({ type: 'autoDiscard' });
+      return;
+    }
+
+    // Finalize through the normal stop path so the blob is transcribed + saved.
+    dispatch({ type: 'autoStopped' });
+    void stop();
+  };
 
   const retryTranscription = useCallback(() => {
     if (!result || mode === null) return;
@@ -410,6 +484,8 @@ export const useRecording = () => {
     liveSegments,
     processingFailed,
     savedMeetingId,
+    warningChannel,
+    autoStopped,
     isRequesting: status === 'requesting',
     isRecording: status === 'recording',
     isPaused: status === 'paused',

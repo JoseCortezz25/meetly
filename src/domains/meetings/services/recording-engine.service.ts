@@ -30,6 +30,10 @@ type ChannelNodes = {
   analyser: AnalyserNode;
   /** Real capture-source name reported by the browser (device or shared tab). */
   label: string;
+  /** Captured audio track — watched for its `ended` event. */
+  track: MediaStreamTrack | null;
+  /** Bound `ended` handler, kept so it can be detached on teardown. */
+  onEnded: () => void;
 };
 
 /**
@@ -46,6 +50,13 @@ export class RecordingEngine {
   private readonly chunks: Blob[] = [];
   private readonly channels = new Map<ChannelKind, ChannelNodes>();
   private mimeType = '';
+  /** Notified when a captured track ends on its own (share stopped, tab closed). */
+  private channelEndedListener: ((channel: ChannelKind) => void) | null = null;
+
+  /** Subscribe to channels ending by themselves. Pass null to unsubscribe. */
+  setOnChannelEnded(listener: ((channel: ChannelKind) => void) | null): void {
+    this.channelEndedListener = listener;
+  }
 
   async start(mode: AudioMode): Promise<void> {
     if (typeof navigator === 'undefined' || !navigator.mediaDevices) {
@@ -148,12 +159,20 @@ export class RecordingEngine {
     gain.connect(analyser);
     analyser.connect(destination);
 
+    // `ended` fires when the source dies on its own (user stops the share, tab
+    // closed, device unplugged) — never from our own track.stop() in teardown.
+    const track = audioTracks[0] ?? null;
+    const onEnded = () => this.channelEndedListener?.(channel);
+    track?.addEventListener('ended', onEnded);
+
     this.channels.set(channel, {
       stream,
       source,
       gain,
       analyser,
-      label: audioTracks[0]?.label ?? ''
+      label: track?.label ?? '',
+      track,
+      onEnded
     });
   }
 
@@ -203,6 +222,7 @@ export class RecordingEngine {
 
   private teardownGraph(): void {
     this.channels.forEach(nodes => {
+      nodes.track?.removeEventListener('ended', nodes.onEnded);
       nodes.source.disconnect();
       nodes.gain.disconnect();
       nodes.analyser.disconnect();
@@ -218,6 +238,7 @@ export class RecordingEngine {
 
   /** Stops everything without producing a Blob (unmount / navigation cleanup). */
   dispose(): void {
+    this.channelEndedListener = null;
     if (this.mediaRecorder && this.mediaRecorder.state !== 'inactive') {
       this.mediaRecorder.onstop = null;
       this.mediaRecorder.stop();

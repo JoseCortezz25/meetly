@@ -30,7 +30,7 @@ const NOTES_LANGUAGE_OPTIONS = NOTES_LANGUAGES.map(option => ({
 
 const PROVIDER_OPTIONS = REMOTE_NOTES_PROVIDERS.map(provider => ({
   id: provider.id,
-  label: provider.label
+  label: settingsMessages.notes.providers[provider.id]
 }));
 
 export const SettingsPanel = () => {
@@ -63,6 +63,11 @@ export const SettingsPanel = () => {
   ];
 
   const activeProvider = findRemoteProvider(provider);
+  const remoteModelOptions = activeProvider.modelIds.map(id => ({
+    id,
+    label: notes.models[id]?.label ?? id,
+    hint: notes.models[id]?.hint
+  }));
 
   return (
     <section>
@@ -184,7 +189,7 @@ export const SettingsPanel = () => {
                 {notes.remoteModelHint}
               </p>
               <OptionChips
-                options={activeProvider.models}
+                options={remoteModelOptions}
                 value={remoteModel}
                 ariaLabel={notes.remoteModelLabel}
                 onChange={setRemoteModel}
@@ -207,7 +212,7 @@ export const SettingsPanel = () => {
               <ApiKeyField
                 value={apiKey}
                 placeholder={notes.apiKeyPlaceholder}
-                ariaLabel={`${activeProvider.label} ${notes.apiKeyLabel}`}
+                ariaLabel={`${notes.providers[activeProvider.id]} ${notes.apiKeyLabel}`}
                 onChange={setApiKey}
               />
             </>

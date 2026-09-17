@@ -36,6 +36,7 @@ export type RecordingErrorCode =
   | 'permission-denied'
   | 'no-system-audio'
   | 'unsupported'
+  | 'source-ended'
   | 'unknown';
 
 /** The output of a finished recording session. */

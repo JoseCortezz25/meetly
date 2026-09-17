@@ -3,10 +3,29 @@ import type { NotesErrorCode } from './types/meeting-detail.types';
 import type { ChannelKind, RecordingErrorCode } from './types/recording.types';
 
 export const dashboardMessages = {
+  // Curated phrase pools per time slot; one is picked per visit. Keeping the
+  // copy here (not in components) follows the domain message-map convention.
   greeting: {
-    morning: 'Good morning',
-    afternoon: 'Good afternoon',
-    evening: 'Good evening'
+    night: [
+      'Still up?',
+      'Burning the midnight oil',
+      'The quiet hours',
+      'Late-night session'
+    ],
+    dawn: ['Up early', 'Rise and shine', 'Early start', 'Good early morning'],
+    morning: ['Good morning', 'Morning', 'Fresh start', 'Ready for the day?'],
+    afternoon: [
+      'Good afternoon',
+      'Afternoon',
+      'Midday momentum',
+      'Hope your day is going well'
+    ],
+    evening: [
+      'Good evening',
+      'Evening',
+      'Winding down?',
+      'Hope you had a good day'
+    ]
   },
   searchPlaceholder: 'Search meetings…',
   hero: {
@@ -55,7 +74,13 @@ export const recordingMessages = {
     noSystemAudio:
       'No system audio was shared. On macOS, share a browser tab and enable "Share tab audio".',
     unsupported: 'Audio recording is not supported in this browser.',
+    sourceEnded: 'The capture source ended before there was anything to save.',
     unknown: 'Something went wrong starting the recording. Please try again.'
+  },
+  autoStop: {
+    stoppedNotice: 'Recording stopped on its own — the captured source ended.',
+    channelEndedWarning: (channelName: string) =>
+      `${channelName} ended — still recording the other channel.`
   },
   result: {
     title: 'Recording saved',
@@ -94,6 +119,7 @@ export const recordingErrorLabels: Record<RecordingErrorCode, string> = {
   'permission-denied': recordingMessages.errors.permissionDenied,
   'no-system-audio': recordingMessages.errors.noSystemAudio,
   unsupported: recordingMessages.errors.unsupported,
+  'source-ended': recordingMessages.errors.sourceEnded,
   unknown: recordingMessages.errors.unknown
 };
 
