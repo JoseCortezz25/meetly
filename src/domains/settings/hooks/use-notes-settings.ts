@@ -12,6 +12,7 @@ import {
   getRemoteNotesApiKey,
   getRemoteNotesModel,
   getRemoteNotesProvider,
+  migrateLegacyOpenCodeStorage,
   setNotesEngineMode,
   setNotesLanguage,
   setNotesModelId,
@@ -37,6 +38,8 @@ export const useNotesSettings = () => {
   const [apiKey, setApiKeyState] = useState<string>('');
 
   useEffect(() => {
+    // Move any key saved under the former OpenCode Zen id to the new Go id first.
+    migrateLegacyOpenCodeStorage();
     setModelState(getNotesModelId());
     setLanguageState(getNotesLanguage());
     const storedMode = getNotesEngineMode();

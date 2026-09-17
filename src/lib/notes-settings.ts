@@ -91,72 +91,41 @@ export const notesLanguageLabel = (code: string): string =>
 
 export type NotesEngineMode = 'local' | 'remote';
 
-export type RemoteNotesProviderId = 'openai' | 'google' | 'opencode-zen';
+export type RemoteNotesProviderId = 'openai' | 'google' | 'opencode-go';
 
+/**
+ * Provider config — non-copy only. Display names and model labels live in the
+ * settings domain message map (see settingsMessages.notes), not here.
+ */
 export type RemoteNotesProvider = {
   id: RemoteNotesProviderId;
-  label: string;
   /** Where the user obtains an API key. */
   apiKeyUrl: string;
   /**
    * OpenAI-compatible base URL. Only set for providers wired through the
-   * openai-compatible adapter (OpenCode Zen); native providers omit it.
+   * openai-compatible adapter (OpenCode Go); native providers omit it.
    */
   baseURL?: string;
-  /** Curated fast, current models only — no legacy models. */
-  models: ModelOption[];
+  /** Curated fast, current model ids only — no legacy models. */
+  modelIds: string[];
 };
 
 export const REMOTE_NOTES_PROVIDERS: RemoteNotesProvider[] = [
   {
     id: 'openai',
-    label: 'OpenAI',
     apiKeyUrl: 'https://platform.openai.com/api-keys',
-    models: [
-      {
-        id: 'gpt-5.6-luna',
-        label: 'GPT-5.6 Luna',
-        hint: 'Fastest, lowest cost'
-      },
-      { id: 'gpt-5.6-terra', label: 'GPT-5.6 Terra', hint: 'Balanced' }
-    ]
+    modelIds: ['gpt-5.6-luna', 'gpt-5.6-terra']
   },
   {
     id: 'google',
-    label: 'Google',
     apiKeyUrl: 'https://aistudio.google.com/apikey',
-    models: [
-      {
-        id: 'gemini-3.6-flash',
-        label: 'Gemini 3.6 Flash',
-        hint: 'Newest, recommended'
-      },
-      { id: 'gemini-3.5-flash', label: 'Gemini 3.5 Flash', hint: 'Fast' },
-      {
-        id: 'gemini-3.5-flash-lite',
-        label: 'Gemini 3.5 Flash Lite',
-        hint: 'Fastest, cheapest'
-      }
-    ]
+    modelIds: ['gemini-3.6-flash', 'gemini-3.5-flash', 'gemini-3.5-flash-lite']
   },
   {
-    id: 'opencode-zen',
-    label: 'OpenCode Zen',
+    id: 'opencode-go',
     apiKeyUrl: 'https://opencode.ai/zen',
-    baseURL: 'https://opencode.ai/zen/v1',
-    models: [
-      { id: 'gpt-5.6-luna', label: 'GPT-5.6 Luna', hint: 'Fast, low cost' },
-      {
-        id: 'gemini-3.5-flash-lite',
-        label: 'Gemini 3.5 Flash Lite',
-        hint: 'Fastest, cheapest'
-      },
-      {
-        id: 'deepseek-v4-flash',
-        label: 'DeepSeek V4 Flash',
-        hint: 'Fast, very cheap'
-      }
-    ]
+    baseURL: 'https://opencode.ai/zen/go/v1',
+    modelIds: ['deepseek-v4.1-flash', 'glm-5.3-flash', 'qwen3.8-flash']
   }
 ];
 
@@ -202,11 +171,11 @@ export const setRemoteNotesProvider = (id: RemoteNotesProviderId): void => {
 /** Selected model for a provider, defaulting to its first (fastest) model. */
 export const getRemoteNotesModel = (id: RemoteNotesProviderId): string => {
   const provider = findRemoteProvider(id);
-  const fallback = provider.models[0].id;
+  const fallback = provider.modelIds[0];
   if (typeof localStorage === 'undefined') return fallback;
   const stored = localStorage.getItem(REMOTE_MODEL_STORAGE_PREFIX + id);
-  const isValid = provider.models.some(model => model.id === stored);
-  return isValid ? (stored as string) : fallback;
+  const isValid = stored !== null && provider.modelIds.includes(stored);
+  return isValid ? stored : fallback;
 };
 
 export const setRemoteNotesModel = (
@@ -231,6 +200,38 @@ export const setRemoteNotesApiKey = (
   localStorage.setItem(REMOTE_API_KEY_STORAGE_PREFIX + id, apiKey);
 };
 
+const LEGACY_OPENCODE_ID = 'opencode-zen';
+const OPENCODE_ID: RemoteNotesProviderId = 'opencode-go';
+
+/**
+ * The OpenCode provider was renamed from Zen to Go (a different endpoint), which
+ * changes its storage-key suffix. Move a key/model saved under the old id to the
+ * new one so a user's pasted key does not silently vanish. Idempotent.
+ */
+export const migrateLegacyOpenCodeStorage = (): void => {
+  if (typeof localStorage === 'undefined') return;
+
+  const move = (prefix: string) => {
+    const legacyKey = prefix + LEGACY_OPENCODE_ID;
+    const legacyValue = localStorage.getItem(legacyKey);
+    if (legacyValue === null) return;
+    const nextKey = prefix + OPENCODE_ID;
+    if (localStorage.getItem(nextKey) === null) {
+      localStorage.setItem(nextKey, legacyValue);
+    }
+    localStorage.removeItem(legacyKey);
+  };
+
+  move(REMOTE_API_KEY_STORAGE_PREFIX);
+  move(REMOTE_MODEL_STORAGE_PREFIX);
+
+  if (
+    localStorage.getItem(REMOTE_PROVIDER_STORAGE_KEY) === LEGACY_OPENCODE_ID
+  ) {
+    localStorage.setItem(REMOTE_PROVIDER_STORAGE_KEY, OPENCODE_ID);
+  }
+};
+
 export type ResolvedNotesEngine =
   | { mode: 'local' }
   | {
@@ -242,6 +243,7 @@ export type ResolvedNotesEngine =
 
 /** Single source of truth the generation service reads before each run. */
 export const getResolvedNotesEngine = (): ResolvedNotesEngine => {
+  migrateLegacyOpenCodeStorage();
   if (getNotesEngineMode() === 'local') return { mode: 'local' };
   const providerId = getRemoteNotesProvider();
   return {

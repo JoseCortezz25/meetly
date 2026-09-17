@@ -8,7 +8,7 @@ import type { RemoteNotesProvider } from '@/lib/notes-settings';
  * Builds a Vercel AI SDK language model for a remote notes provider, using the
  * user's own API key. Runs in the browser (bring-your-own-key, local-first).
  *
- * OpenCode Zen exposes an OpenAI-compatible endpoint, so it is wired through
+ * OpenCode Go exposes an OpenAI-compatible endpoint, so it is wired through
  * the openai-compatible adapter with the provider's base URL; OpenAI and Google
  * use their native providers.
  */
@@ -22,7 +22,7 @@ export const createRemoteNotesModel = (
       return createOpenAI({ apiKey })(model);
     case 'google':
       return createGoogleGenerativeAI({ apiKey })(model);
-    case 'opencode-zen':
+    case 'opencode-go':
       return createOpenAICompatible({
         name: provider.id,
         baseURL: provider.baseURL ?? '',
