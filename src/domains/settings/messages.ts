@@ -18,7 +18,7 @@ export const settingsMessages = {
       'The language the generated notes are written in. "Same as transcript" keeps the meeting\'s own language.',
     engineLabel: 'Engine',
     engineHint:
-      'Generate notes on-device, or use a hosted provider with your own API key. Your key is stored only in this browser and calls run from your device — nothing is sent to a Meetly server.',
+      'Generate notes on-device, or use a hosted provider with your own API key. Your key is stored only in this browser; for hosted providers the request is proxied through Meetly’s server (the key is used per request and never stored).',
     engineOptions: {
       local: 'On-device',
       remote: 'API key'

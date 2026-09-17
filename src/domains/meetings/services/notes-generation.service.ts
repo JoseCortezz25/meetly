@@ -6,7 +6,6 @@ import {
   getResolvedNotesEngine,
   type ResolvedNotesEngine
 } from '@/lib/notes-settings';
-import { createRemoteNotesModel } from './notes-providers.service';
 import {
   chunkTranscriptTurns,
   estimateTokens,
@@ -344,6 +343,13 @@ const generateNotesChunked = async (
  * API key. Remote models have large context windows, so the whole transcript
  * runs in a single streamed pass — no on-device chunking / map-reduce.
  */
+/**
+ * Generates notes through a hosted provider. The call is proxied by the app's
+ * own `/api/notes` route (a Vercel function) because providers like OpenAI and
+ * OpenCode Go send no CORS headers, so the browser cannot reach them directly.
+ * The key travels to that same-origin route per request and is never stored.
+ * Remote models have large context windows, so it is a single streamed pass.
+ */
 const generateNotesRemote = async (
   engine: Extract<ResolvedNotesEngine, { mode: 'remote' }>,
   transcript: TranscriptTurn[],
@@ -356,19 +362,62 @@ const generateNotesRemote = async (
       'No API key configured for the selected provider.'
     );
   }
-  const model = createRemoteNotesModel(
-    engine.provider,
-    engine.model,
-    engine.apiKey
-  );
+
   onProgress?.({ stage: 'generating', progress: 1 });
-  const raw = await runGenerationPass(model, {
-    system: prompts.single,
-    prompt: buildPrompt(transcript),
-    signal,
-    isRemote: true,
-    onDelta: onText
-  });
+
+  let response: Response;
+  try {
+    response = await fetch('/api/notes', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        provider: engine.provider.id,
+        model: engine.model,
+        apiKey: engine.apiKey,
+        system: prompts.single,
+        prompt: buildPrompt(transcript)
+      }),
+      signal
+    });
+  } catch (error) {
+    if (error instanceof DOMException && error.name === 'AbortError')
+      throw error;
+    throw new NotesError(
+      'provider-error',
+      'Could not reach the notes service.'
+    );
+  }
+
+  if (response.status === 401) {
+    throw new NotesError(
+      'api-key-missing',
+      'The provider rejected the API key.'
+    );
+  }
+  if (!response.ok || !response.body) {
+    throw new NotesError(
+      'provider-error',
+      'The AI provider failed while generating notes.'
+    );
+  }
+
+  const reader = response.body.getReader();
+  const decoder = new TextDecoder();
+  let raw = '';
+  while (true) {
+    const { done, value } = await reader.read();
+    if (done) break;
+    raw += decoder.decode(value, { stream: true });
+    onText?.(raw);
+  }
+
+  if (raw.trim().length === 0) {
+    throw new NotesError(
+      'provider-error',
+      'The AI provider returned an empty response.'
+    );
+  }
+
   return parseNotes(raw);
 };
 
