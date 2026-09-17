@@ -2,7 +2,11 @@
 
 import { useEffect, useState } from 'react';
 import { dashboardMessages } from '../messages';
-import { formatDateLabel, resolveGreetingKey } from '../utils/greeting.util';
+import {
+  formatDateLabel,
+  resolveGreetingKey,
+  selectGreeting
+} from '../utils/greeting.util';
 
 type DashboardGreeting = {
   greeting: string;
@@ -23,8 +27,12 @@ export const useDashboardGreeting = (
 
   useEffect(() => {
     const now = new Date();
+    const phrases =
+      dashboardMessages.greeting[resolveGreetingKey(now.getHours())];
+    // Seed from the clock (not Math.random) so the phrase varies per visit while
+    // staying deterministic — and only runs post-mount, so no hydration drift.
     setGreeting({
-      greeting: dashboardMessages.greeting[resolveGreetingKey(now.getHours())],
+      greeting: selectGreeting(phrases, now.getTime()),
       dateLabel: formatDateLabel(now)
     });
   }, []);

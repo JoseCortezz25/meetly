@@ -11,7 +11,11 @@ import { RecordingControls } from '../molecules/recording-controls';
 import { RecordingProcessing } from './recording-processing';
 import { RecordingStage } from './recording-stage';
 import { useRecording } from '../../hooks/use-recording';
-import { recordingErrorLabels, recordingMessages } from '../../messages';
+import {
+  channelMeta,
+  recordingErrorLabels,
+  recordingMessages
+} from '../../messages';
 import type { AudioMode } from '../../types/meeting.types';
 
 const RECORDING_MODES: AudioMode[] = ['mic', 'sys', 'mix'];
@@ -33,6 +37,8 @@ export const RecordingWorkspace = () => {
     liveSegments,
     processingFailed,
     savedMeetingId,
+    warningChannel,
+    autoStopped,
     isRequesting,
     isRecording,
     isPaused,
@@ -69,15 +75,22 @@ export const RecordingWorkspace = () => {
       </Link>
 
       {isPostStop ? (
-        <RecordingProcessing
-          transcription={transcription}
-          liveSegments={liveSegments}
-          processingFailed={processingFailed}
-          result={result}
-          downloadName={slugify(meetingName)}
-          onRetry={retryTranscription}
-          onRecordAgain={discardResult}
-        />
+        <>
+          {autoStopped && (
+            <p className="border-line bg-ink-2 text-sand rounded-card mb-4 border px-4 py-3 text-[13px]">
+              {recordingMessages.autoStop.stoppedNotice}
+            </p>
+          )}
+          <RecordingProcessing
+            transcription={transcription}
+            liveSegments={liveSegments}
+            processingFailed={processingFailed}
+            result={result}
+            downloadName={slugify(meetingName)}
+            onRetry={retryTranscription}
+            onRecordAgain={discardResult}
+          />
+        </>
       ) : (
         <>
           <div className="mb-5">
@@ -125,12 +138,21 @@ export const RecordingWorkspace = () => {
                 )}
               </>
             ) : (
-              <RecordingControls
-                timecode={timecode}
-                isPaused={isPaused}
-                onTogglePause={isPaused ? resume : pause}
-                onStop={stop}
-              />
+              <>
+                <RecordingControls
+                  timecode={timecode}
+                  isPaused={isPaused}
+                  onTogglePause={isPaused ? resume : pause}
+                  onStop={stop}
+                />
+                {warningChannel && (
+                  <span className="text-sys text-[12.5px]">
+                    {recordingMessages.autoStop.channelEndedWarning(
+                      channelMeta[warningChannel].title
+                    )}
+                  </span>
+                )}
+              </>
             )}
           </div>
         </>
